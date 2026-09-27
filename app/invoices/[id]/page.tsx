@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import {
   ArrowLeft,
   Download,
@@ -39,13 +39,9 @@ import { GoldenHornetInvoiceView } from "@/components/golden-hornet-invoice-view
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 
-export default function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const resolvedParams = use(params)
-  const invoiceId = resolvedParams.id
+export default function InvoiceDetailPage() {
+  const routeParams = useParams()
+  const invoiceId = routeParams?.id as string
   const router = useRouter()
   const { toast } = useToast()
 
@@ -54,19 +50,34 @@ export default function InvoiceDetailPage({
   const [isExporting, setIsExporting] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    if (!invoiceId) return
     const inv = invoiceStore.getInvoiceById(invoiceId)
     setInvoice(inv || null)
     setAuditLogs(invoiceStore.getAuditLogs().filter((l) => l.entityId === invoiceId))
+    setIsLoading(false)
 
     const unsubscribe = invoiceStore.subscribe(() => {
       const updated = invoiceStore.getInvoiceById(invoiceId)
       setInvoice(updated || null)
       setAuditLogs(invoiceStore.getAuditLogs().filter((l) => l.entityId === invoiceId))
     })
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+    }
   }, [invoiceId])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-center text-xs text-slate-500 font-medium">
+          Loading invoice details...
+        </div>
+      </div>
+    )
+  }
 
   if (!invoice) {
     return (

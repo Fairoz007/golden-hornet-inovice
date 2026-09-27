@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import {
   FileText,
@@ -33,13 +33,9 @@ import {
 import { amountToWordsOMR } from "@/lib/number-to-words"
 import { GoldenHornetInvoiceView } from "@/components/golden-hornet-invoice-view"
 
-export default function EditDraftInvoicePage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const resolvedParams = use(params)
-  const invoiceId = resolvedParams.id
+export default function EditDraftInvoicePage() {
+  const routeParams = useParams()
+  const invoiceId = routeParams?.id as string
   const router = useRouter()
   const { toast } = useToast()
 

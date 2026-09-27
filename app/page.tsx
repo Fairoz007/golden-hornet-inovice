@@ -1,7 +1,7 @@
 "use client"
 
-import InvoicesPage from "@/app/invoices/page"
+import { InvoicesLedger } from "@/components/invoices-ledger"
 
 export default function RootPage() {
-  return <InvoicesPage />
+  return <InvoicesLedger />
 }
