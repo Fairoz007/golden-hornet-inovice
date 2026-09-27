@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import InvoicesPage from "@/app/invoices/page"
 
 export default function RootPage() {
-  redirect("/invoices")
+  return <InvoicesPage />
 }
