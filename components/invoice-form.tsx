@@ -1,6 +1,6 @@
 "use client"
 
-import type { InvoiceData, InvoiceItem } from "@/app/page"
+import type { InvoiceData, InvoiceItem } from "@/lib/doc-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +17,7 @@ type InvoiceFormProps = {
 
 export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: InvoiceFormProps) {
   const handleInputChange = (field: keyof InvoiceData, value: any) => {
-    setInvoiceData((prev) => ({
+    setInvoiceData((prev: InvoiceData) => ({
       ...prev,
       [field]: value,
     }))
@@ -33,7 +33,7 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
     item.lineTotal = qty * price
 
     updatedItems[index] = item
-    setInvoiceData((prev) => ({
+    setInvoiceData((prev: InvoiceData) => ({
       ...prev,
       items: updatedItems,
     }))
@@ -50,7 +50,7 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
       taxRate: 5.0,
       lineTotal: 0,
     }
-    setInvoiceData((prev) => ({
+    setInvoiceData((prev: InvoiceData) => ({
       ...prev,
       items: [...prev.items, newItem],
     }))
@@ -58,8 +58,8 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
 
   const removeItem = (index: number) => {
     if (invoiceData.items.length === 1) return
-    const updatedItems = invoiceData.items.filter((_, i) => i !== index)
-    setInvoiceData((prev) => ({
+    const updatedItems = invoiceData.items.filter((_: InvoiceItem, i: number) => i !== index)
+    setInvoiceData((prev: InvoiceData) => ({
       ...prev,
       items: updatedItems,
     }))
@@ -72,7 +72,7 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
     }
     const preset = INVOICE_PRESETS.find((p) => p.id === presetId)
     if (preset) {
-      setInvoiceData((prev) => ({
+      setInvoiceData((prev: InvoiceData) => ({
         ...prev,
         invoiceNumber: preset.invoiceNumber,
         invoiceDate: preset.invoiceDate,
@@ -303,7 +303,7 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
         </div>
 
         <div className="space-y-3">
-          {invoiceData.items.map((item, index) => (
+          {invoiceData.items.map((item: InvoiceItem, index: number) => (
             <div
               key={item.id || index}
               className="rounded-lg border border-slate-200 p-3 bg-slate-50/70 hover:bg-slate-50 transition-colors"

@@ -2,6 +2,8 @@
 
 import Image from "next/image"
 import type { QuotationData } from "./quotation-form"
+import { amountToWordsOMR } from "@/lib/number-to-words"
+import { GOLDEN_HORNET_COMPANY } from "@/lib/dummy-data"
 
 type QuotationPreviewProps = {
   data: QuotationData
@@ -13,240 +15,331 @@ export function QuotationPreview({ data, documentTitle = "QUOTATION" }: Quotatio
     return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
   }, 0)
 
+  const taxableValue = subtotal - (Number(data.discount) || 0)
+
   const totalTax = data.items.reduce((sum, item) => {
     const itemSubtotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
     return sum + itemSubtotal * ((Number(item.taxRate) || 0) / 100)
   }, 0)
 
-  const grandTotal = subtotal + totalTax - (Number(data.discount) || 0)
+  const grandTotal = taxableValue + totalTax
   const currency = data.currency || "OMR"
+  const amountWords = amountToWordsOMR(grandTotal)
 
   return (
     <div
       id="quotation-preview"
-      className="mx-auto w-full max-w-[210mm] bg-white p-8 text-sm text-[#1F2937] shadow-sm"
-      style={{ minHeight: "297mm", boxSizing: "border-box" }}
+      className="mx-auto w-full max-w-[210mm] bg-white text-slate-900 shadow-md print:shadow-none print:m-0 print:p-0"
+      style={{
+        minHeight: "297mm",
+        boxSizing: "border-box",
+        fontFamily: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      }}
     >
-      {/* 1. Header Banner */}
-      <div className="mb-8">
+      {/* 1. Golden Hornet Header Banner */}
+      <div className="w-full">
         <Image
-          src="/images/header.jpg"
-          alt="Company Letterhead"
-          width={1600}
-          height={400}
-          className="h-auto w-full"
+          src="/images/gh_header.png"
+          alt="Golden Hornet Letterhead"
+          width={1190}
+          height={220}
+          className="w-full h-auto object-contain block"
           priority
         />
       </div>
 
-      {/* 2. Document Title */}
-      <div className="mb-4 text-center">
-        <h1 className="text-xl font-bold tracking-widest text-[#1e3a8a] uppercase">
-          {documentTitle}
-        </h1>
-      </div>
-
-      {/* 3. Quotation Details Card */}
-      <div className="mb-6 rounded-lg bg-[#DBEAFE] p-4">
-        <div className="grid grid-cols-3 gap-4 text-xs">
-          <div>
-            <div className="mb-1 font-semibold text-[#1F2937]">Quotation No:</div>
-            <div className="font-medium text-[#1F2937]">{data.quotationNumber || "FFE-QT-000001"}</div>
-          </div>
-          <div>
-            <div className="mb-1 font-semibold text-[#1F2937]">Quotation Date:</div>
-            <div className="text-[#1F2937]">{data.quotationDate}</div>
-          </div>
-          <div>
-            <div className="mb-1 font-semibold text-[#1F2937]">Valid Until:</div>
-            <div className="text-[#1F2937]">{data.validUntil}</div>
-          </div>
-        </div>
-
-        {(data.rfqNumber || data.paymentTerms) && (
-          <div className="mt-3 grid grid-cols-3 gap-4 border-t border-[#93C5FD] pt-3 text-xs">
-            {data.rfqNumber && (
+      <div className="p-6 pt-2 pb-4">
+        {/* Outer Framed Box matching invoice design */}
+        <div className="border border-slate-900 flex flex-col justify-between" style={{ minHeight: "235mm" }}>
+          <div className="p-4 pb-2">
+            {/* Company Credentials */}
+            <div className="text-[11px] leading-tight text-slate-900 mb-2">
+              <div className="font-bold text-[13px] tracking-wide text-slate-950">
+                {GOLDEN_HORNET_COMPANY.name}
+              </div>
+              <div>{GOLDEN_HORNET_COMPANY.address}</div>
+              <div className="font-semibold">VATIN :- {GOLDEN_HORNET_COMPANY.vatin}</div>
+              <div>Sultanate of Oman</div>
               <div>
-                <div className="mb-1 font-semibold text-[#1F2937]">Reference / RFQ:</div>
-                <div className="text-[#1F2937]">{data.rfqNumber}</div>
+                Tel: {GOLDEN_HORNET_COMPANY.tel}, Fax: {GOLDEN_HORNET_COMPANY.fax}
+              </div>
+              <div>
+                Email: {GOLDEN_HORNET_COMPANY.email}, website: {GOLDEN_HORNET_COMPANY.website}
+              </div>
+            </div>
+
+            {/* Document Title */}
+            <div className="my-2 text-center border-t border-b border-slate-900 py-1">
+              <h1 className="text-base font-extrabold tracking-widest text-slate-950 uppercase">
+                {documentTitle}
+              </h1>
+            </div>
+
+            {/* Client (Left) & Quotation Meta (Right) */}
+            <div className="grid grid-cols-12 gap-3 mb-3 items-start">
+              {/* Customer Box */}
+              <div className="col-span-7 border border-slate-900 p-2.5 bg-white text-[11px] min-h-[90px]">
+                <div className="text-[10px] uppercase font-bold text-amber-800 mb-1">
+                  QUOTATION PREPARED FOR:
+                </div>
+                <div className="font-bold text-[12px] text-slate-950 mb-0.5">
+                  {data.billToName || "Customer Name"}
+                </div>
+                {data.billToAddress && (
+                  <div className="whitespace-pre-line text-slate-800">{data.billToAddress}</div>
+                )}
+                {data.billToCity && <div className="text-slate-800">{data.billToCity}</div>}
+                {data.billToVatin && (
+                  <div className="font-semibold text-slate-900 mt-1">VATIN: {data.billToVatin}</div>
+                )}
+                {data.billToPhone && (
+                  <div className="text-slate-700">Tel: {data.billToPhone}</div>
+                )}
+                {data.billToEmail && (
+                  <div className="text-slate-700">Email: {data.billToEmail}</div>
+                )}
+              </div>
+
+              {/* Quotation Meta */}
+              <div className="col-span-5 flex flex-col justify-start text-right text-[11px] space-y-1 pt-1">
+                <div>
+                  <span className="font-bold text-slate-950">Quotation No: </span>
+                  <span className="font-semibold text-slate-900">{data.quotationNumber || "GH-QT-2026-0089"}</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-950">Date: </span>
+                  <span className="text-slate-900">
+                    {data.quotationDate ? data.quotationDate.split("-").reverse().join("-") : "25-09-2026"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-950">Valid Until: </span>
+                  <span className="text-slate-900">
+                    {data.validUntil ? data.validUntil.split("-").reverse().join("-") : "25-10-2026"}
+                  </span>
+                </div>
+                {data.rfqNumber && (
+                  <div>
+                    <span className="font-medium text-slate-700">RFQ Ref: </span>
+                    <span className="text-slate-900">{data.rfqNumber}</span>
+                  </div>
+                )}
+                {data.paymentTerms && (
+                  <div>
+                    <span className="font-medium text-slate-700">Payment Terms: </span>
+                    <span className="text-slate-900">{data.paymentTerms}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="mb-2">
+              <table className="w-full border-collapse border border-slate-900 text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100/90 text-slate-950 font-bold border-b border-slate-900">
+                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[7%]">Sl.No</th>
+                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[12%]">Item No</th>
+                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[51%]">Description of Machinery / Service</th>
+                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[8%]">Qty</th>
+                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[11%]">Rate</th>
+                    <th className="py-1 px-2 text-center w-[11%]">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((item, idx) => {
+                    const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+                    return (
+                      <tr key={item.id || idx} className="border-b border-slate-300 min-h-[36px]">
+                        <td className="border-r border-slate-900 p-2 text-center align-top font-medium">
+                          {idx + 1}
+                        </td>
+                        <td className="border-r border-slate-900 p-2 text-center align-top text-[10px] font-mono text-slate-700">
+                          {item.itemNo || `0${idx + 1}`}
+                        </td>
+                        <td className="border-r border-slate-900 p-2 align-top text-left font-medium text-slate-900 whitespace-pre-line leading-snug">
+                          {item.description}
+                        </td>
+                        <td className="border-r border-slate-900 p-2 text-center align-top font-semibold">
+                          {item.quantity}
+                        </td>
+                        <td className="border-r border-slate-900 p-2 text-right align-top whitespace-nowrap">
+                          <span className="text-[9px] text-slate-600 mr-1">{currency}</span>
+                          <span className="font-medium">{(Number(item.unitPrice) || 0).toFixed(3)}</span>
+                        </td>
+                        <td className="p-2 text-right align-top whitespace-nowrap font-semibold">
+                          <span className="text-[9px] text-slate-600 mr-1">{currency}</span>
+                          <span>{lineTotal.toFixed(3)}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {data.items.length < 3 && (
+                    <tr style={{ height: `${(3 - data.items.length) * 45}px` }}>
+                      <td className="border-r border-slate-900"></td>
+                      <td className="border-r border-slate-900"></td>
+                      <td className="border-r border-slate-900"></td>
+                      <td className="border-r border-slate-900"></td>
+                      <td className="border-r border-slate-900"></td>
+                      <td></td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              {/* Totals Table */}
+              <div className="flex justify-end border-x border-b border-slate-900 bg-white">
+                <div className="w-[45%] text-[10px] leading-tight">
+                  <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
+                    <span className="font-semibold text-slate-800">Sub Total</span>
+                    <span className="font-semibold">
+                      {currency} {subtotal.toFixed(3)}
+                    </span>
+                  </div>
+                  {Number(data.discount) > 0 && (
+                    <div className="flex justify-between border-b border-slate-300 px-2.5 py-1 text-red-600">
+                      <span className="font-semibold">Discount</span>
+                      <span className="font-semibold">
+                        -{currency} {(Number(data.discount) || 0).toFixed(3)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
+                    <span className="font-semibold text-slate-800">Taxable Value</span>
+                    <span className="font-semibold">
+                      {currency} {taxableValue.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
+                    <span className="font-semibold text-slate-800">Value Added Tax 5 %</span>
+                    <span className="font-semibold">
+                      {currency} {totalTax.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between bg-slate-100 px-2.5 py-1.5 font-bold text-[11px] text-slate-950">
+                    <span>QUOTATION TOTAL</span>
+                    <span>
+                      {currency} {grandTotal.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount In Words Row */}
+              <div className="border-x border-b border-slate-900 px-3 py-1.5 bg-slate-50/70 text-[10.5px]">
+                <span className="font-bold text-slate-950">In Words : </span>
+                <span className="font-semibold text-slate-900">{amountWords}</span>
+              </div>
+            </div>
+
+            {/* Terms and Conditions */}
+            {data.notes && (
+              <div className="my-2 border border-slate-900 p-2 text-[10px] leading-relaxed bg-slate-50/40">
+                <div className="font-bold text-slate-950 mb-0.5">QUOTATION TERMS & CONDITIONS:</div>
+                <div className="whitespace-pre-line text-slate-700">{data.notes}</div>
               </div>
             )}
-            {data.paymentTerms && (
-              <div>
-                <div className="mb-1 font-semibold text-[#1F2937]">Payment Terms:</div>
-                <div className="text-[#1F2937]">{data.paymentTerms}</div>
+
+            {/* Bank Transfer Details */}
+            <div className="my-2 border border-slate-900 p-2 text-[10px] leading-relaxed">
+              <div className="font-bold text-slate-950 border-b border-slate-300 pb-0.5 mb-1 tracking-wide">
+                BANK DETAILS FOR PAYMENT
               </div>
-            )}
-            <div>
-              <div className="mb-1 font-semibold text-[#1F2937]">Currency:</div>
-              <div className="text-[#1F2937]">{currency}</div>
+              <div className="grid grid-cols-12">
+                <span className="col-span-4 text-slate-700">Bank Name</span>
+                <span className="col-span-8 font-semibold text-slate-950">
+                  : {GOLDEN_HORNET_COMPANY.bankName}
+                </span>
+              </div>
+              <div className="grid grid-cols-12">
+                <span className="col-span-4 text-slate-700">Beneficiary Name</span>
+                <span className="col-span-8 font-semibold text-slate-950">
+                  : {GOLDEN_HORNET_COMPANY.name}
+                </span>
+              </div>
+              <div className="grid grid-cols-12">
+                <span className="col-span-4 text-slate-700">Account Number</span>
+                <span className="col-span-8 font-bold text-slate-950">
+                  : {GOLDEN_HORNET_COMPANY.accountNumber}
+                </span>
+              </div>
+              <div className="grid grid-cols-12">
+                <span className="col-span-4 text-slate-700">IBAN</span>
+                <span className="col-span-8 font-semibold text-slate-950">
+                  : {GOLDEN_HORNET_COMPANY.iban}
+                </span>
+              </div>
+              <div className="grid grid-cols-12">
+                <span className="col-span-4 text-slate-700">Swift Code / Branch</span>
+                <span className="col-span-8 font-semibold text-slate-950">
+                  : {GOLDEN_HORNET_COMPANY.swiftCode} ({GOLDEN_HORNET_COMPANY.branch})
+                </span>
+              </div>
+            </div>
+
+            {/* Signatures & Seal Section */}
+            <div className="mt-4 pt-2 border-t border-slate-900 grid grid-cols-3 gap-2 items-center text-center text-[10px]">
+              {/* Client Acceptance */}
+              <div className="flex flex-col items-center justify-end h-24 pb-1">
+                <div className="w-36 border-b border-slate-800 mb-1"></div>
+                <span className="font-bold text-slate-900">Client Acceptance & Signature</span>
+              </div>
+
+              {/* Round Stamp */}
+              <div className="flex flex-col items-center justify-center h-24">
+                {data.showStamp !== false ? (
+                  <div className="relative h-20 w-20 transform -rotate-1 hover:rotate-0 transition-transform">
+                    <Image
+                      src="/images/stamp.png"
+                      alt="Golden Hornet Official Stamp"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-16 w-16 border border-dashed border-slate-300 rounded-full flex items-center justify-center text-[9px] text-slate-400">
+                    Official Stamp
+                  </div>
+                )}
+              </div>
+
+              {/* Authorized Signatory */}
+              <div className="flex flex-col items-center justify-end h-24 pb-1">
+                <span className="font-bold text-slate-950 mb-0.5">For Golden Hornet LLC</span>
+                {data.showSignature !== false ? (
+                  <div className="relative h-12 w-28 my-0.5">
+                    <Image
+                      src="/images/signature.png"
+                      alt="Authorized Signature"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-10 w-28 border-b border-slate-800"></div>
+                )}
+                <span className="font-bold text-slate-900">Commercial Manager</span>
+              </div>
+            </div>
+
+            <div className="mt-2 text-center text-[11px] font-bold tracking-wider text-slate-900 italic">
+              THANK YOU FOR THE OPPORTUNITY TO QUOTE!
             </div>
           </div>
-        )}
-      </div>
-
-      {/* 4. Client / Bill To Card */}
-      <div className="mb-6 grid grid-cols-2 gap-6 rounded-lg border-2 border-[#E5E7EB] bg-white p-4 text-xs">
-        <div>
-          <div className="mb-2 font-bold uppercase text-[#2563EB]">Quotation For</div>
-          {data.billToName ? (
-            <>
-              <div className="font-semibold text-[#1F2937]">{data.billToName}</div>
-              {data.billToAddress && (
-                <div className="mt-1 whitespace-pre-wrap text-[#4B5563]">{data.billToAddress}</div>
-              )}
-              {data.billToCity && <div className="text-[#4B5563]">{data.billToCity}</div>}
-              {data.billToPhone && (
-                <div className="mt-1 font-medium text-[#1F2937]">Tel: {data.billToPhone}</div>
-              )}
-              {data.billToEmail && <div className="text-[#4B5563]">{data.billToEmail}</div>}
-            </>
-          ) : (
-            <div className="text-[#6B7280]">No client information provided</div>
-          )}
-        </div>
-
-        {(data.shipToName || data.shipToAddress || data.shipToCity) && (
-          <div>
-            <div className="mb-2 font-bold uppercase text-[#2563EB]">Attention / Site</div>
-            {data.shipToName && (
-              <div className="font-semibold text-[#1F2937]">{data.shipToName}</div>
-            )}
-            {data.shipToAddress && (
-              <div className="mt-1 whitespace-pre-wrap text-[#4B5563]">{data.shipToAddress}</div>
-            )}
-            {data.shipToCity && <div className="text-[#4B5563]">{data.shipToCity}</div>}
-          </div>
-        )}
-      </div>
-
-      {/* 5. Items Table */}
-      <div className="mb-6">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="bg-[#2563EB] text-white">
-              <th className="border border-[#1D4ED8] p-3 text-left font-bold w-[12%]">Item No</th>
-              <th className="border border-[#1D4ED8] p-3 text-left font-bold w-[46%]">Description</th>
-              <th className="border border-[#1D4ED8] p-3 text-right font-bold w-[10%]">Qty</th>
-              <th className="border border-[#1D4ED8] p-3 text-right font-bold w-[16%]">Unit Price</th>
-              <th className="border border-[#1D4ED8] p-3 text-right font-bold w-[16%]">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((item, index) => {
-              const itemTotal =
-                (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) * (1 + (Number(item.taxRate) || 0) / 100)
-              return (
-                <tr key={item.id || index} className={index % 2 === 0 ? "bg-[#F9FAFB]" : "bg-white"}>
-                  <td className="border border-[#E5E7EB] p-3 text-[#1F2937]">
-                    {item.itemNo || `00${index + 1}0`.slice(-6)}
-                  </td>
-                  <td className="border border-[#E5E7EB] p-3 text-[#1F2937]">
-                    <div className="font-medium">{item.description || "-"}</div>
-                  </td>
-                  <td className="border border-[#E5E7EB] p-3 text-right text-[#1F2937]">
-                    {item.quantity}
-                  </td>
-                  <td className="border border-[#E5E7EB] p-3 text-right text-[#1F2937]">
-                    {(Number(item.unitPrice) || 0).toFixed(3)}
-                  </td>
-                  <td className="border border-[#E5E7EB] p-3 text-right font-bold text-[#1F2937]">
-                    {itemTotal.toFixed(3)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 6. Summary Totals */}
-      <div className="mb-6 flex justify-end">
-        <div className="w-80 space-y-2 text-xs">
-          <div className="flex justify-between border-b border-[#E5E7EB] bg-white px-4 py-3">
-            <span className="font-medium text-[#4B5563]">Subtotal:</span>
-            <span className="font-semibold text-[#1F2937]">
-              {currency} {subtotal.toFixed(3)}
-            </span>
-          </div>
-          {totalTax > 0 && (
-            <div className="flex justify-between border-b border-[#E5E7EB] bg-white px-4 py-3">
-              <span className="font-medium text-[#4B5563]">VAT/Tax:</span>
-              <span className="font-semibold text-[#1F2937]">
-                {currency} {totalTax.toFixed(3)}
-              </span>
-            </div>
-          )}
-          {Number(data.discount) > 0 && (
-            <div className="flex justify-between border-b border-[#E5E7EB] bg-white px-4 py-3">
-              <span className="font-medium text-[#4B5563]">Discount:</span>
-              <span className="font-semibold text-[#DC2626]">
-                -{currency} {Number(data.discount).toFixed(3)}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between rounded-md bg-[#DBEAFE] px-4 py-4">
-            <span className="text-base font-bold text-[#1F2937]">Grand Total:</span>
-            <span className="text-lg font-bold text-[#1F2937]">
-              {currency} {grandTotal.toFixed(3)}
-            </span>
-          </div>
         </div>
       </div>
 
-      {/* 7. Notes & Terms */}
-      {data.notes && (
-        <div className="mb-6 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-4 text-xs">
-          <div className="mb-2 font-bold text-[#1F2937]">Terms & Conditions:</div>
-          <div className="whitespace-pre-wrap text-[#4B5563]">{data.notes}</div>
-        </div>
-      )}
-
-      {/* 8. Bank Details Card */}
-      <div className="mb-6 rounded-lg border-2 border-[#2563EB] bg-[#DBEAFE] p-4 text-xs">
-        <div className="mb-2 font-bold text-[#2563EB]">BANK TRANSFER DETAILS</div>
-        <div className="space-y-1 text-[#1F2937]">
-          <div className="flex">
-            <span className="w-32 font-semibold">Company Name:</span>
-            <span>FUTURE FRONT EXCELLENCE LLC</span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-semibold">Account Number:</span>
-            <span>0338080791430018</span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-semibold">IBAN No:</span>
-            <span>OM430270338080791430018</span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-semibold">Branch Name:</span>
-            <span>0338 - Br Al Amerat</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 9. Dual Signatures */}
-      <div className="mb-6 flex justify-between items-end gap-8 pt-8 border-t border-[#E5E7EB]">
-        <div className="flex flex-col items-center">
-          <div className="h-12" />
-          <div className="border-t border-[#9CA3AF] pt-1 text-xs font-medium text-[#1F2937] min-w-[160px] text-center">
-            Authorized Signature
-          </div>
-        </div>
-        <div className="flex flex-col items-center">
-          <div className="h-12" />
-          <div className="border-t border-[#9CA3AF] pt-1 text-xs font-medium text-[#1F2937] min-w-[160px] text-center">
-            Client Acceptance & Seal
-          </div>
-        </div>
-      </div>
-
-      {/* 10. Footer */}
-      <div className="border-t-2 border-[#E5E7EB] pt-4 text-center text-xs text-[#6B7280]">
-        <p className="font-semibold">Thank you for the opportunity to quote!</p>
-        <p className="mt-1">
-          If you have any questions regarding this quotation, please contact us at +968 7637 3445
-        </p>
+      {/* Footer Banner */}
+      <div className="w-full mt-auto">
+        <Image
+          src="/images/gh_footer.png"
+          alt="Golden Hornet Footer"
+          width={1190}
+          height={110}
+          className="w-full h-auto object-contain block"
+          priority
+        />
       </div>
     </div>
   )

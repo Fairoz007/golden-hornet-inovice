@@ -1,122 +1,181 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoicePreview } from "@/components/invoice-preview"
 import { Button } from "@/components/ui/button"
-import { Download, Printer, RotateCcw } from "lucide-react"
+import { Download, Printer, RotateCcw, Save, Sparkles, FileCheck, CheckCircle2 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
-import type { InvoiceData } from "@/app/page"
+import { useToast } from "@/hooks/use-toast"
+import type { InvoiceData } from "@/lib/doc-types"
+import { INVOICE_PRESETS, GOLDEN_HORNET_COMPANY } from "@/lib/dummy-data"
 
-const generateProvisionalNumber = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const random = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")
-  return `FFE-PI-${year}-${month}-${random}`
-}
+const defaultProformaData: InvoiceData = {
+  companyName: GOLDEN_HORNET_COMPANY.name,
+  companyNameArabic: GOLDEN_HORNET_COMPANY.arabicName,
+  crNumber: GOLDEN_HORNET_COMPANY.crNumber,
+  vatin: GOLDEN_HORNET_COMPANY.vatin,
+  address: GOLDEN_HORNET_COMPANY.address,
+  phone: GOLDEN_HORNET_COMPANY.tel,
+  fax: GOLDEN_HORNET_COMPANY.fax,
+  email: GOLDEN_HORNET_COMPANY.email,
+  website: GOLDEN_HORNET_COMPANY.website,
 
-const defaultInvoiceData: InvoiceData = {
-  companyName: "",
-  crNumber: "",
-  address: "",
-  phone: "",
-  email: "",
-  invoiceNumber: "",
+  invoiceNumber: "GH-PI-2026-0044",
   autoInvoiceNumber: true,
-  isReserved: false,
   invoiceDate: new Date().toISOString().split("T")[0],
-  dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-  customerNumber: "",
-  billToName: "",
-  billToAddress: "",
-  billToCity: "",
-  billToPhone: "",
-  billToEmail: "",
-  shipToName: "",
-  shipToAddress: "",
-  shipToCity: "",
-  shipToPhone: "",
+  dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  customerNumber: "CUST-RET-0304",
+
+  billToName: "Renewable Energy Technology Investment",
+  billToAddress: "P.O.BOX: 311, Sohar",
+  billToCity: "Sultanate of Oman",
+  billToPhone: "+968 26845200",
+  billToEmail: "procurement@renewable-energy.om",
+  billToVatin: "OM110038464X",
+
+  purchaseOrderNumber: "RT-OM-PRJ-O-304-2026-0063",
+  paymentTerms: "100% Advance Payment Against Proforma Invoice",
+  currency: "OMR",
+  discount: 0,
+  notes: "Proforma Invoice for mobilization advance of heavy equipment fleet and tipper trucks for Sohar Solar Park Project.",
+
+  bankName: GOLDEN_HORNET_COMPANY.bankName,
+  bankAccount: GOLDEN_HORNET_COMPANY.accountNumber,
+  bankIban: GOLDEN_HORNET_COMPANY.iban,
+  bankSwift: GOLDEN_HORNET_COMPANY.swiftCode,
+  bankBranch: GOLDEN_HORNET_COMPANY.branch,
+
+  showStamp: true,
+  showSignature: true,
+
   items: [
     {
       id: "1",
-      itemNo: "000010",
-      description: "",
+      itemNo: "01",
+      description: "Advance Mobilization Deposit for 4x Tipper Trucks (24 CBM Fleet)\nProject Site: Sohar Solar Park Phase 2",
+      poRef: "RT-OM-PRJ-O-304-2026-0063",
       quantity: 1,
-      unitPrice: 0,
-      taxRate: 0,
-      lineTotal: 0,
+      unitPrice: 2000.0,
+      taxRate: 5.0,
+      lineTotal: 2000.0,
+    },
+    {
+      id: "2",
+      itemNo: "02",
+      description: "Site Setup and Certified Heavy Equipment Operator Mobilization",
+      poRef: "RT-OM-PRJ-O-304-2026-0063",
+      quantity: 1,
+      unitPrice: 500.0,
+      taxRate: 5.0,
+      lineTotal: 500.0,
     },
   ],
-  currency: "OMR",
-  discount: 0,
-  paymentTerms: "Bank Transfer",
-  paymentMethod: "Bank Transfer",
-  purchaseOrderNumber: "",
-  notes: "",
 }
 
 export default function ProformaInvoicePage() {
-  const [invoiceData, setInvoiceData] = useState<InvoiceData>(defaultInvoiceData)
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [data, setData] = useState<InvoiceData>(defaultProformaData)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
-    const draft = localStorage.getItem("pi:draft")
+    const draft = localStorage.getItem("pi:gh_draft")
     if (draft) {
-      setInvoiceData(JSON.parse(draft))
-    } else {
-      setInvoiceData((prev) => {
-        if (prev.invoiceNumber || prev.autoInvoiceNumber === false) return prev
-        return { ...prev, invoiceNumber: generateProvisionalNumber(), isReserved: false }
-      })
+      try {
+        const parsed = JSON.parse(draft)
+        setData(parsed)
+      } catch (e) {
+        console.error("Error restoring PI draft:", e)
+      }
     }
   }, [])
 
   const saveDraft = () => {
-    localStorage.setItem("pi:draft", JSON.stringify(invoiceData))
-    alert("Draft saved successfully!")
+    localStorage.setItem("pi:gh_draft", JSON.stringify(data))
+    toast({
+      title: "Draft Saved",
+      description: "Proforma Invoice draft saved to local storage.",
+    })
+  }
+
+  const loadPreset = (presetId: string) => {
+    const preset = INVOICE_PRESETS.find((p) => p.id === presetId)
+    if (preset) {
+      setData((prev: InvoiceData) => ({
+        ...prev,
+        invoiceNumber: `GH-PI-2026-${preset.invoiceNumber.split("-")[0]}`,
+        invoiceDate: preset.invoiceDate,
+        dueDate: preset.dueDate,
+        customerNumber: preset.customerNumber,
+        billToName: preset.billToName,
+        billToAddress: preset.billToAddress,
+        billToCity: preset.billToCity,
+        billToPhone: preset.billToPhone,
+        billToEmail: preset.billToEmail,
+        billToVatin: preset.billToVatin,
+        purchaseOrderNumber: preset.purchaseOrderNumber,
+        paymentTerms: "Advance Payment Against Proforma Invoice",
+        currency: preset.currency,
+        discount: preset.discount,
+        notes: `Proforma for ${preset.name}`,
+        items: preset.items,
+        showStamp: preset.showStamp,
+        showSignature: preset.showSignature,
+      }))
+      toast({
+        title: "Dummy Data Loaded",
+        description: `Loaded preset: ${preset.name}`,
+      })
+    }
+  }
+
+  const resetToBlank = () => {
+    setData({
+      ...defaultProformaData,
+      invoiceNumber: `GH-PI-${new Date().getFullYear()}-0001`,
+      invoiceDate: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      customerNumber: "",
+      billToName: "",
+      billToAddress: "",
+      billToCity: "Sultanate of Oman",
+      billToPhone: "",
+      billToEmail: "",
+      billToVatin: "",
+      purchaseOrderNumber: "",
+      items: [
+        {
+          id: "1",
+          itemNo: "01",
+          description: "",
+          poRef: "",
+          quantity: 1,
+          unitPrice: 0,
+          taxRate: 5.0,
+          lineTotal: 0,
+        },
+      ],
+      notes: "",
+    })
+    toast({
+      title: "Reset Form",
+      description: "Proforma invoice reset to clean blank form.",
+    })
   }
 
   const handleDownloadPDF = async () => {
-    setIsGeneratingPDF(true)
+    setIsGenerating(true)
     try {
-      const previewElement = document.getElementById("invoice-preview")
-      if (!previewElement) {
-        throw new Error("Invoice preview element not found")
-      }
+      const preview = document.getElementById("invoice-preview")
+      if (!preview) throw new Error("Preview element not found")
 
-      const cloned = previewElement.cloneNode(true) as HTMLElement
-      const allElements = cloned.querySelectorAll("*")
-      allElements.forEach((el) => {
-        const htmlEl = el as HTMLElement
-        const computedStyle = window.getComputedStyle(el)
-        try {
-          if (computedStyle.backgroundColor) htmlEl.style.backgroundColor = computedStyle.backgroundColor
-          if (computedStyle.color) htmlEl.style.color = computedStyle.color
-          if (computedStyle.borderColor) htmlEl.style.borderColor = computedStyle.borderColor
-        } catch (e) {}
-      })
-
-      cloned.style.width = "210mm"
-      cloned.style.minHeight = "297mm"
-      cloned.style.boxSizing = "border-box"
-      cloned.style.background = "#ffffff"
-      cloned.style.padding = "12mm"
-      cloned.style.position = "absolute"
-      cloned.style.left = "-9999px"
-
-      document.body.appendChild(cloned)
-
-      const canvas = await html2canvas(cloned, {
+      const canvas = await html2canvas(preview, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
       })
-
-      document.body.removeChild(cloned)
 
       const imgData = canvas.toDataURL("image/png")
       const pdf = new jsPDF({
@@ -125,36 +184,25 @@ export default function ProformaInvoicePage() {
         format: "a4",
       })
 
-      const scale = 2
-      const dpi = 96 * scale
-      const pxToMm = 25.4 / dpi
+      const imgWidth = 210
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const imgWidthPx = canvas.width
-      const imgHeightPx = canvas.height
-      const imgWidthMm = imgWidthPx * pxToMm
-      const imgHeightMm = imgHeightPx * pxToMm
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, Math.min(imgHeight, 297))
+      pdf.save(`GH_Proforma_${data.invoiceNumber || "Draft"}.pdf`)
 
-      const zoomFactor = 1.12
-      const baseRatio = Math.min(pdfWidth / imgWidthMm, pdfHeight / imgHeightMm)
-      let ratio = baseRatio * zoomFactor
-      if (imgWidthMm * ratio > pdfWidth || imgHeightMm * ratio > pdfHeight) {
-        ratio = baseRatio
-      }
-
-      const finalWidth = imgWidthMm * ratio
-      const finalHeight = imgHeightMm * ratio
-      const imgX = (pdfWidth - finalWidth) / 2
-      const imgY = 0
-
-      pdf.addImage(imgData, "PNG", imgX, imgY, finalWidth, finalHeight)
-      pdf.save(`Proforma-Invoice-${invoiceData.invoiceNumber}.pdf`)
+      toast({
+        title: "PDF Generated",
+        description: "Official Golden Hornet Proforma Invoice downloaded.",
+      })
     } catch (error) {
-      console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      console.error("PDF generation failed:", error)
+      toast({
+        title: "Export Failed",
+        description: "Could not generate PDF. Please try Print.",
+        variant: "destructive",
+      })
     } finally {
-      setIsGeneratingPDF(false)
+      setIsGenerating(false)
     }
   }
 
@@ -162,172 +210,115 @@ export default function ProformaInvoicePage() {
     window.print()
   }
 
-  const handleReset = async () => {
-    setInvoiceData({
-      ...defaultInvoiceData,
-      invoiceNumber: generateProvisionalNumber(),
-      isReserved: false,
-      invoiceDate: new Date().toISOString().split("T")[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    })
-    localStorage.removeItem("pi:draft")
-  }
-
   return (
-    <main className="min-h-screen bg-[#F9FAFB]">
-      <div className="mx-auto max-w-[1800px] px-4 py-8 lg:px-8">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-balance text-3xl font-bold tracking-tight text-[#1F2937] lg:text-4xl">
-              Proforma Invoice Generator
-            </h1>
-            <p className="mt-2 text-[#6B7280]">Create professional proforma invoices in seconds</p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href="/">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">Invoice</Button>
-              </Link>
-              <Link href="/quotation">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">Quotation</Button>
-              </Link>
-              <Link href="/delivery-order">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">Delivery Order</Button>
-              </Link>
-              <Link href="/purchase-order">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">Purchase Order</Button>
-              </Link>
-              <Link href="/proforma-invoice">
-                <Button className="bg-[#2563EB] text-white">Proforma Invoice</Button>
-              </Link>
+    <div className="min-h-screen bg-slate-100/70 pb-16">
+      {/* Top Banner Actions Toolbar */}
+      <div className="sticky top-[61px] z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md shadow-xs print:hidden">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-800 border border-amber-300/50">
+              <FileCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold text-slate-900 leading-tight">
+                Proforma Invoice Generator
+              </h1>
+              <p className="text-xs text-slate-500">
+                Official Golden Hornet LLC Advance & Proforma Billing
+              </p>
             </div>
           </div>
-          <div className="flex gap-3">
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
+              type="button"
               variant="outline"
-              size="default"
-              onClick={handleReset}
-              className="hidden sm:flex bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
+              size="sm"
+              onClick={() => loadPreset("ret-tipper")}
+              className="gap-1.5 border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 text-xs font-semibold"
             >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              Load Dummy Data
             </Button>
+
             <Button
+              type="button"
               variant="outline"
-              size="default"
-              onClick={handlePrint}
-              className="hidden sm:flex bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
-            >
-              <Printer className="mr-2 h-4 w-4" />
-              Print
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
+              size="sm"
               onClick={saveDraft}
-              className="hidden sm:flex bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50"
             >
+              <Save className="h-3.5 w-3.5" />
               Save Draft
             </Button>
+
             <Button
-              size="default"
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
-              className="bg-[#2563EB] text-white hover:bg-[#1D4ED8] border-0"
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetToBlank}
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50 text-slate-600"
             >
-              <Download className="mr-2 h-4 w-4" />
-              {isGeneratingPDF ? "Generating..." : "Download PDF"}
+              <RotateCcw className="h-3.5 w-3.5" />
+              Blank Form
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Print
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleDownloadPDF}
+              disabled={isGenerating}
+              className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {isGenerating ? "Exporting..." : "Download PDF"}
             </Button>
           </div>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div className="space-y-6">
-            <InvoiceForm invoiceData={invoiceData} setInvoiceData={setInvoiceData} />
-          </div>
-
-          <div className="lg:sticky lg:top-8 lg:h-fit">
-            <div className="rounded-lg border border-[#E5E7EB] bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-[#1F2937]">Live Preview</h2>
-              <div className="overflow-auto">
-                <InvoicePreview invoiceData={invoiceData} documentTitle="Proforma Invoice" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-wrap gap-3 sm:hidden">
-          <Button
-            variant="outline"
-            size="default"
-            onClick={handleReset}
-            className="flex-1 bg-white border-[#E5E7EB] text-[#1F2937]"
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Reset
-          </Button>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={handlePrint}
-            className="flex-1 bg-white border-[#E5E7EB] text-[#1F2937]"
-          >
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={saveDraft}
-            className="flex-1 bg-white border-[#E5E7EB] text-[#1F2937]"
-          >
-            Save Draft
-          </Button>
         </div>
       </div>
 
-      <style jsx global>{`
-        /* Print layout: show only the invoice preview and fit to A4. */
-        @page {
-          size: A4;
-          margin: 0;
-        }
+      {/* Main Container */}
+      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left: Input Form */}
+          <div className="lg:col-span-6 space-y-6 print:hidden">
+            <InvoiceForm
+              invoiceData={data}
+              setInvoiceData={setData}
+              onLoadPreset={loadPreset}
+            />
+          </div>
 
-        @media print {
-          html, body {
-            height: 100%;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact;
-          }
+          {/* Right: Live A4 Document Preview */}
+          <div className="lg:col-span-6 lg:sticky lg:top-[128px]">
+            <div className="mb-2 flex items-center justify-between px-1 print:hidden">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                Live Official Preview (A4)
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Proforma Invoice Document
+              </span>
+            </div>
 
-          /* Hide everything except the invoice preview */
-          body * {
-            visibility: hidden !important;
-          }
-          #invoice-preview,
-          #invoice-preview * {
-            visibility: visible !important;
-          }
-
-          /* Position the preview to the top-left and size to A4 */
-          #invoice-preview {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            /* To visually match the downloaded PDF (slight zoom), we scale the content
-               and reduce the container width so the scaled content fits an A4 page. */
-            transform: scale(1.12);
-            transform-origin: top left;
-            width: 187.5mm !important; /* 210mm / 1.12 */
-            min-height: 265.179mm !important; /* 297mm / 1.12 */
-            box-shadow: none !important;
-            background: #ffffff !important;
-            margin: 0 !important;
-            padding: 10.714mm !important; /* 12mm / 1.12 */
-          }
-
-          @page { margin: 0; }
-        }
-      `}</style>
-    </main>
+            <div className="overflow-auto rounded-xl border border-slate-300/80 bg-white p-2 shadow-md">
+              <InvoicePreview invoiceData={data} documentTitle="PROFORMA INVOICE" />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   )
 }

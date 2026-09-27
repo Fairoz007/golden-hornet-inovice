@@ -1,100 +1,128 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { QuotationForm, type QuotationData } from "@/components/quotation-form"
 import { QuotationPreview } from "@/components/quotation-preview"
 import { Button } from "@/components/ui/button"
-import { Download, Printer, RotateCcw, Save, History } from "lucide-react"
+import { Download, Printer, RotateCcw, Save, Sparkles, FileSpreadsheet, CheckCircle2 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
-
-const generateProvisionalNumber = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const random = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")
-  return `FFE-QT-${year}-${month}-${random}`
-}
+import { QUOTATION_PRESETS } from "@/lib/dummy-data"
 
 const defaultQuotationData: QuotationData = {
-  quotationNumber: "",
+  quotationNumber: QUOTATION_PRESETS[0].quotationNumber,
   autoQuotationNumber: true,
-  quotationDate: new Date().toISOString().split("T")[0],
-  validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-  rfqNumber: "",
-  paymentTerms: "50% Advance, 50% on Delivery",
+  quotationDate: QUOTATION_PRESETS[0].quotationDate,
+  validUntil: QUOTATION_PRESETS[0].validUntil,
+  rfqNumber: QUOTATION_PRESETS[0].rfqNumber,
+  paymentTerms: QUOTATION_PRESETS[0].paymentTerms,
   currency: "OMR",
-  discount: 0,
+  discount: QUOTATION_PRESETS[0].discount,
 
-  billToName: "",
-  billToAddress: "",
-  billToCity: "",
-  billToPhone: "",
-  billToEmail: "",
+  billToName: QUOTATION_PRESETS[0].billToName,
+  billToAddress: QUOTATION_PRESETS[0].billToAddress,
+  billToCity: QUOTATION_PRESETS[0].billToCity,
+  billToPhone: QUOTATION_PRESETS[0].billToPhone,
+  billToEmail: QUOTATION_PRESETS[0].billToEmail,
+  billToVatin: QUOTATION_PRESETS[0].billToVatin,
 
-  shipToName: "",
-  shipToAddress: "",
-  shipToCity: "",
-
-  items: [
-    {
-      id: "1",
-      itemNo: "000010",
-      description: "",
-      quantity: 1,
-      unitPrice: 0,
-      taxRate: 0,
-      lineTotal: 0,
-    },
-  ],
-
-  notes: "1. Quotation is valid for 30 days from the date of issue.\n2. Delivery time: 7-14 business days after confirmation.",
+  items: QUOTATION_PRESETS[0].items,
+  notes: QUOTATION_PRESETS[0].notes,
+  showStamp: true,
+  showSignature: true,
 }
 
 export default function QuotationPage() {
   const [data, setData] = useState<QuotationData>(defaultQuotationData)
   const [isGenerating, setIsGenerating] = useState(false)
   const { toast } = useToast()
-  const router = useRouter()
 
   useEffect(() => {
-    const draft = localStorage.getItem("quotation:draft")
+    const draft = localStorage.getItem("quotation:gh_draft")
     if (draft) {
       try {
         const parsed = JSON.parse(draft)
-        setData((prev) => ({ ...prev, ...parsed }))
+        setData(parsed)
       } catch (e) {
-        console.error("Error restoring Quotation draft:", e)
+        console.error("Error restoring quotation draft:", e)
       }
-    } else {
-      setData((prev) => {
-        if (prev.quotationNumber || prev.autoQuotationNumber === false) return prev
-        return { ...prev, quotationNumber: generateProvisionalNumber() }
-      })
     }
   }, [])
 
   const saveDraft = () => {
-    localStorage.setItem("quotation:draft", JSON.stringify(data))
+    localStorage.setItem("quotation:gh_draft", JSON.stringify(data))
     toast({
       title: "Draft Saved",
-      description: "Quotation draft has been saved successfully.",
+      description: "Quotation draft saved to local storage.",
     })
   }
 
-  const reset = () => {
+  const loadPreset = (presetId: string) => {
+    const preset = QUOTATION_PRESETS.find((p) => p.id === presetId)
+    if (preset) {
+      setData({
+        quotationNumber: preset.quotationNumber,
+        quotationDate: preset.quotationDate,
+        validUntil: preset.validUntil,
+        rfqNumber: preset.rfqNumber,
+        paymentTerms: preset.paymentTerms,
+        currency: preset.currency,
+        discount: preset.discount,
+        billToName: preset.billToName,
+        billToAddress: preset.billToAddress,
+        billToCity: preset.billToCity,
+        billToPhone: preset.billToPhone,
+        billToEmail: preset.billToEmail,
+        billToVatin: preset.billToVatin,
+        shipToName: preset.shipToName,
+        shipToAddress: preset.shipToAddress,
+        shipToCity: preset.shipToCity,
+        items: preset.items,
+        notes: preset.notes,
+        showStamp: preset.showStamp,
+        showSignature: preset.showSignature,
+      })
+      toast({
+        title: "Dummy Data Loaded",
+        description: `Loaded preset: ${preset.name}`,
+      })
+    }
+  }
+
+  const resetToBlank = () => {
     setData({
-      ...defaultQuotationData,
-      quotationNumber: generateProvisionalNumber(),
+      quotationNumber: `GH-QT-${new Date().getFullYear()}-0001`,
       quotationDate: new Date().toISOString().split("T")[0],
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      rfqNumber: "",
+      paymentTerms: "30 Days from invoice submission",
+      currency: "OMR",
+      discount: 0,
+      billToName: "",
+      billToAddress: "",
+      billToCity: "Sultanate of Oman",
+      billToPhone: "",
+      billToEmail: "",
+      billToVatin: "",
+      items: [
+        {
+          id: "1",
+          itemNo: "01",
+          description: "",
+          quantity: 1,
+          unitPrice: 0,
+          taxRate: 5.0,
+          lineTotal: 0,
+        },
+      ],
+      notes: "1. Quotation is valid for 30 calendar days.\n2. Rates include operator, fuel, and standard maintenance.",
+      showStamp: true,
+      showSignature: true,
     })
     toast({
-      title: "Reset",
-      description: "Quotation reset to default values.",
+      title: "Reset Form",
+      description: "Quotation reset to clean blank form.",
     })
   }
 
@@ -104,65 +132,35 @@ export default function QuotationPage() {
       const preview = document.getElementById("quotation-preview")
       if (!preview) throw new Error("Preview element not found")
 
-      const cloned = preview.cloneNode(true) as HTMLElement
-      const all = cloned.querySelectorAll("*")
-      all.forEach((el) => {
-        try {
-          const s = window.getComputedStyle(el as Element)
-          if (s.backgroundColor) (el as HTMLElement).style.backgroundColor = s.backgroundColor
-          if (s.color) (el as HTMLElement).style.color = s.color
-          if (s.borderColor) (el as HTMLElement).style.borderColor = s.borderColor
-        } catch (e) {}
-      })
-
-      cloned.style.width = "210mm"
-      cloned.style.minHeight = "297mm"
-      cloned.style.boxSizing = "border-box"
-      cloned.style.background = "#ffffff"
-      cloned.style.padding = "12mm"
-      cloned.style.position = "absolute"
-      cloned.style.left = "-9999px"
-      cloned.style.top = "0"
-      document.body.appendChild(cloned)
-
-      const canvas = await html2canvas(cloned, {
+      const canvas = await html2canvas(preview, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
       })
-      document.body.removeChild(cloned)
 
       const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
-      const scale = 2
-      const dpi = 96 * scale
-      const pxToMm = 25.4 / dpi
-      const imgWidthMm = canvas.width * pxToMm
-      const imgHeightMm = canvas.height * pxToMm
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const zoom = 1.12
-      const baseRatio = Math.min(pdfWidth / imgWidthMm, pdfHeight / imgHeightMm)
-      let ratio = baseRatio * zoom
-      if (imgWidthMm * ratio > pdfWidth || imgHeightMm * ratio > pdfHeight) ratio = baseRatio
-
-      const finalWidth = imgWidthMm * ratio
-      const finalHeight = imgHeightMm * ratio
-      const imgX = (pdfWidth - finalWidth) / 2
-
-      pdf.addImage(imgData, "PNG", imgX, 0, finalWidth, finalHeight)
-      pdf.save(`Quotation-${data.quotationNumber || "draft"}.pdf`)
-
-      toast({
-        title: "PDF Downloaded",
-        description: `Quotation ${data.quotationNumber || ""} has been downloaded successfully.`,
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       })
-    } catch (e) {
-      console.error("Error downloading PDF:", e)
+
+      const imgWidth = 210
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, Math.min(imgHeight, 297))
+      pdf.save(`GH_Quotation_${data.quotationNumber || "Draft"}.pdf`)
+
       toast({
-        title: "Error",
-        description: "Failed to generate PDF. Please try again.",
+        title: "PDF Generated",
+        description: "Official Golden Hornet Quotation downloaded.",
+      })
+    } catch (error) {
+      console.error("PDF generation failed:", error)
+      toast({
+        title: "Export Failed",
+        description: "Could not generate PDF. Please try Print.",
         variant: "destructive",
       })
     } finally {
@@ -170,145 +168,115 @@ export default function QuotationPage() {
     }
   }
 
-  const handlePrint = () => window.print()
+  const handlePrint = () => {
+    window.print()
+  }
 
   return (
-    <main className="min-h-screen bg-[#F9FAFB]">
-      <div className="mx-auto max-w-[1800px] px-4 py-8 lg:px-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-balance text-3xl font-bold tracking-tight text-[#1F2937] lg:text-4xl">
-              Quotation Generator
-            </h1>
-            <p className="mt-2 text-[#6B7280]">Create professional quotations and price estimates in seconds</p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href="/">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">
-                  Invoice
-                </Button>
-              </Link>
-              <Link href="/quotation">
-                <Button className="bg-[#2563EB] text-white">Quotation</Button>
-              </Link>
-              <Link href="/delivery-order">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">
-                  Delivery Order
-                </Button>
-              </Link>
-              <Link href="/purchase-order">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">
-                  Purchase Order
-                </Button>
-              </Link>
-              <Link href="/proforma-invoice">
-                <Button variant="outline" className="bg-white border-[#E5E7EB] text-[#1F2937]">
-                  Proforma Invoice
-                </Button>
-              </Link>
+    <div className="min-h-screen bg-slate-100/70 pb-16">
+      {/* Top Banner Actions Toolbar */}
+      <div className="sticky top-[61px] z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md shadow-xs print:hidden">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-800 border border-amber-300/50">
+              <FileSpreadsheet className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold text-slate-900 leading-tight">
+                Quotation Generator
+              </h1>
+              <p className="text-xs text-slate-500">
+                Official Golden Hornet LLC Commercial Proposal
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
+              type="button"
               variant="outline"
-              size="default"
-              onClick={() => router.push("/invoices")}
-              className="hidden sm:flex bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
+              size="sm"
+              onClick={() => loadPreset("ret-quote")}
+              className="gap-1.5 border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 text-xs font-semibold"
             >
-              <History className="mr-2 h-4 w-4" />
-              History
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              Load Dummy Data
             </Button>
+
             <Button
+              type="button"
               variant="outline"
-              onClick={reset}
-              className="bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
-              title="Reset"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset
-            </Button>
-            <Button
-              variant="outline"
+              size="sm"
               onClick={saveDraft}
-              className="bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50"
             >
-              <Save className="mr-2 h-4 w-4" />
+              <Save className="h-3.5 w-3.5" />
               Save Draft
             </Button>
+
             <Button
+              type="button"
               variant="outline"
-              onClick={handlePrint}
-              className="bg-white border-[#E5E7EB] text-[#1F2937] hover:bg-[#F9FAFB]"
+              size="sm"
+              onClick={resetToBlank}
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50 text-slate-600"
             >
-              <Printer className="mr-2 h-4 w-4" />
+              <RotateCcw className="h-3.5 w-3.5" />
+              Blank Form
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50"
+            >
+              <Printer className="h-3.5 w-3.5" />
               Print
             </Button>
+
             <Button
+              type="button"
+              size="sm"
               onClick={handleDownloadPDF}
               disabled={isGenerating}
-              className="bg-[#2563EB] text-white hover:bg-[#1D4ED8] border-0"
+              className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs"
             >
-              <Download className="mr-2 h-4 w-4" />
-              {isGenerating ? "Generating..." : "Download PDF"}
+              <Download className="h-3.5 w-3.5" />
+              {isGenerating ? "Exporting..." : "Download PDF"}
             </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div className="space-y-6">
-            <QuotationForm data={data} setData={setData} />
-          </div>
-          <div className="lg:sticky lg:top-8 lg:h-fit">
-            <div className="rounded-lg border border-[#E5E7EB] bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-[#1F2937]">Live Preview</h2>
-              <div className="overflow-auto">
-                <QuotationPreview data={data} />
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      <style jsx global>{`
-        @media print {
-          html,
-          body {
-            height: 100%;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
+      {/* Main Container */}
+      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left: Input Form */}
+          <div className="lg:col-span-6 space-y-6 print:hidden">
+            <QuotationForm data={data} setData={setData} onLoadPreset={loadPreset} />
+          </div>
 
-          /* Hide everything except the Quotation preview */
-          body * {
-            visibility: hidden !important;
-          }
-          #quotation-preview,
-          #quotation-preview * {
-            visibility: visible !important;
-          }
+          {/* Right: Live A4 Document Preview */}
+          <div className="lg:col-span-6 lg:sticky lg:top-[128px]">
+            <div className="mb-2 flex items-center justify-between px-1 print:hidden">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                Live Official Preview (A4)
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Commercial Quotation Proposal
+              </span>
+            </div>
 
-          #quotation-preview {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            transform: scale(1.12);
-            transform-origin: top left;
-            width: 187.5mm !important; /* 210mm / 1.12 */
-            min-height: 265.179mm !important; /* 297mm / 1.12 */
-            box-shadow: none !important;
-            background: #ffffff !important;
-            margin: 0 !important;
-            padding: 10.714mm !important;
-          }
-
-          @page {
-            margin: 0;
-            size: A4 portrait;
-          }
-        }
-      `}</style>
-    </main>
+            <div className="overflow-auto rounded-xl border border-slate-300/80 bg-white p-2 shadow-md">
+              <QuotationPreview data={data} />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   )
 }

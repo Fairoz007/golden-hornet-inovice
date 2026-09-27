@@ -1,122 +1,126 @@
 "use client"
 
 import Image from "next/image"
-import type { InvoiceData, InvoiceItem } from "@/lib/doc-types"
-import { amountToWordsOMR } from "@/lib/number-to-words"
+import type { InvoiceRecord } from "@/lib/invoice-store"
+import { formatOMR } from "@/lib/financial-calculator"
 
-type InvoicePreviewProps = {
-  invoiceData: InvoiceData
-  documentTitle?: string
+interface GoldenHornetInvoiceViewProps {
+  invoice: InvoiceRecord
+  showLetterhead?: boolean
 }
 
-export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: InvoicePreviewProps) {
-  const subtotal = invoiceData.items.reduce((sum: number, item: InvoiceItem) => {
-    return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-  }, 0)
+export function GoldenHornetInvoiceView({
+  invoice,
+  showLetterhead = true,
+}: GoldenHornetInvoiceViewProps) {
+  const letterheadUrl = invoice.letterheadAsset || "/images/letter_head.png"
+  const stampUrl = invoice.stampAsset || "/images/stamp.png"
+  const signatureUrl = invoice.signatureAsset || "/images/signature.png"
+  const currency = invoice.currency || "OMR"
 
-  const taxableValue = subtotal - (Number(invoiceData.discount) || 0)
-
-  const totalTax = invoiceData.items.reduce((sum: number, item: InvoiceItem) => {
-    const itemSubtotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-    return sum + itemSubtotal * ((Number(item.taxRate) || 0) / 100)
-  }, 0)
-
-  const grandTotal = taxableValue + totalTax
-  const currency = invoiceData.currency || "OMR"
-  const amountWords = amountToWordsOMR(grandTotal)
+  // Date formatting DD-MM-YYYY
+  const formatDate = (dStr?: string) => {
+    if (!dStr) return ""
+    const parts = dStr.split("-")
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`
+    return dStr
+  }
 
   return (
     <div
-      id="invoice-preview"
-      className="mx-auto w-full max-w-[210mm] bg-white text-slate-900 shadow-md print:shadow-none print:m-0 print:p-0"
+      id="invoice-document"
+      className="relative mx-auto w-full max-w-[210mm] bg-white text-slate-900 shadow-xl print:shadow-none print:m-0 print:p-0 overflow-hidden"
       style={{
         minHeight: "297mm",
         boxSizing: "border-box",
         fontFamily: "'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
       }}
     >
-      {/* Top Golden Hornet Letterhead Header Banner */}
-      <div className="w-full">
-        <Image
-          src="/images/gh_header.png"
-          alt="Golden Hornet Letterhead"
-          width={1190}
-          height={220}
-          className="w-full h-auto object-contain block"
-          priority
-        />
-      </div>
+      {/* 1. Official Golden Hornet Letterhead Full-Page Background */}
+      {showLetterhead && (
+        <div className="absolute inset-0 w-full h-full pointer-events-none select-none z-0">
+          <img
+            src={letterheadUrl}
+            alt="Letterhead Template"
+            className="w-full h-full object-fill block"
+          />
+        </div>
+      )}
 
-      <div className="p-6 pt-2 pb-4">
+      {/* 2. Printable Content Layer: strictly positioned between header banner and footer banner */}
+      <div className="relative z-10 pt-[108px] pb-[70px] px-8 flex flex-col justify-between" style={{ minHeight: "297mm" }}>
         {/* Outer Framed Box matching sample_invoice.png */}
-        <div className="border border-slate-900 flex flex-col justify-between" style={{ minHeight: "235mm" }}>
-          <div className="p-4 pb-2">
+        <div className="border border-slate-900 flex flex-col justify-between p-3.5 bg-white/95" style={{ minHeight: "238mm" }}>
+          <div>
             {/* Company Credentials */}
-            <div className="text-[11px] leading-tight text-slate-900 mb-2">
-              <div className="font-bold text-[13px] tracking-wide text-slate-950">
-                {invoiceData.companyName || "Golden Hornet LLC"}
+            <div className="text-[10.5px] leading-tight text-slate-900 mb-2">
+              <div className="font-bold text-[12.5px] tracking-wide text-slate-950">
+                {invoice.companyDetailsSnapshot?.name || "Golden Hornet LLC"}
               </div>
-              <div>{invoiceData.address || "P.O. Box: 680, P.C:121, Sultanate of Oman"}</div>
-              <div className="font-semibold">VATIN :- {invoiceData.vatin || "OM1100158810"}</div>
+              <div>{invoice.companyDetailsSnapshot?.address || "P.O. Box: 680, P.C:121, Sultanate of Oman"}</div>
+              <div className="font-semibold">VATIN :- {invoice.companyDetailsSnapshot?.vatin || "OM1100158810"}</div>
               <div>Sultanate of Oman</div>
               <div>
-                Tel: {invoiceData.phone || "+968 24813684"}, Fax: {invoiceData.fax || "+(968) 24813200"}
+                Tel: {invoice.companyDetailsSnapshot?.tel || "+968 24813684"}, Fax: {invoice.companyDetailsSnapshot?.fax || "+(968) 24813200"}
               </div>
               <div>
-                Email: {invoiceData.email || "info@goldenhornet.net"}, website: {invoiceData.website || "www.goldenhornet.net"}
+                Email: {invoice.companyDetailsSnapshot?.email || "info@goldenhornet.net"}, website: {invoice.companyDetailsSnapshot?.website || "www.goldenhornet.net"}
               </div>
             </div>
 
-            {/* Document Title with gold/charcoal underline */}
-            <div className="my-2 text-center border-t border-b border-slate-900 py-1">
+            {/* Document Title with subtle top & bottom rules */}
+            <div className="my-1.5 text-center border-t border-b border-slate-900 py-1">
               <h1 className="text-base font-extrabold tracking-widest text-slate-950 uppercase">
-                {documentTitle}
+                TAX INVOICE
               </h1>
             </div>
 
             {/* Customer Box (Left) & Invoice Meta (Right) */}
-            <div className="grid grid-cols-12 gap-3 mb-3 items-start">
-              {/* Client Box */}
+            <div className="grid grid-cols-12 gap-3 mb-2.5 items-start">
+              {/* Customer Box */}
               <div className="col-span-8 border border-slate-900 p-2.5 bg-white text-[11px] min-h-[85px]">
                 <div className="font-bold text-[12px] text-slate-950 mb-0.5">
-                  {invoiceData.billToName || "Customer Name"}
+                  {invoice.customerSnapshot?.companyName || "Customer Name"}
                 </div>
-                {invoiceData.billToAddress && (
-                  <div className="whitespace-pre-line text-slate-800">{invoiceData.billToAddress}</div>
+                {invoice.customerSnapshot?.poBox && (
+                  <div className="text-slate-800">{invoice.customerSnapshot.poBox}</div>
                 )}
-                {invoiceData.billToCity && <div className="text-slate-800">{invoiceData.billToCity}</div>}
-                {invoiceData.billToVatin && (
-                  <div className="font-semibold text-slate-900 mt-1">VATIN: {invoiceData.billToVatin}</div>
+                {invoice.customerSnapshot?.address && invoice.customerSnapshot.address !== invoice.customerSnapshot.poBox && (
+                  <div className="whitespace-pre-line text-slate-800">{invoice.customerSnapshot.address}</div>
                 )}
-                {invoiceData.billToPhone && (
-                  <div className="text-slate-700">Tel: {invoiceData.billToPhone}</div>
+                {invoice.customerSnapshot?.city && (
+                  <div className="text-slate-800">{invoice.customerSnapshot.city}</div>
+                )}
+                {invoice.customerSnapshot?.vatin && (
+                  <div className="font-semibold text-slate-900 mt-1">
+                    VATIN: {invoice.customerSnapshot.vatin}
+                  </div>
+                )}
+                {invoice.customerSnapshot?.phone && (
+                  <div className="text-slate-700">Tel: {invoice.customerSnapshot.phone}</div>
                 )}
               </div>
 
-              {/* Invoice Number & Date */}
+              {/* Invoice Meta */}
               <div className="col-span-4 flex flex-col justify-start text-right text-[11px] space-y-1 pt-1">
                 <div>
                   <span className="font-bold text-slate-950">Invoice No: </span>
-                  <span className="font-semibold text-slate-900">{invoiceData.invoiceNumber || "1250-2026"}</span>
+                  <span className="font-semibold text-slate-900">{invoice.invoiceNumber}</span>
                 </div>
                 <div>
                   <span className="font-bold text-slate-950">Date: </span>
-                  <span className="text-slate-900">
-                    {invoiceData.invoiceDate ? invoiceData.invoiceDate.split("-").reverse().join("-") : "07-09-2026"}
-                  </span>
+                  <span className="text-slate-900">{formatDate(invoice.invoiceDate)}</span>
                 </div>
-                {invoiceData.dueDate && (
+                {invoice.dueDate && (
                   <div>
                     <span className="font-medium text-slate-700">Due Date: </span>
-                    <span className="text-slate-900">
-                      {invoiceData.dueDate.split("-").reverse().join("-")}
-                    </span>
+                    <span className="text-slate-900">{formatDate(invoice.dueDate)}</span>
                   </div>
                 )}
-                {invoiceData.customerNumber && (
+                {invoice.poNumber && (
                   <div>
-                    <span className="font-medium text-slate-700">Cust No: </span>
-                    <span className="text-slate-900">{invoiceData.customerNumber}</span>
+                    <span className="font-bold text-slate-950">PO Ref: </span>
+                    <span className="text-slate-900">{invoice.poNumber}</span>
                   </div>
                 )}
               </div>
@@ -127,43 +131,43 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
               <table className="w-full border-collapse border border-slate-900 text-[11px]">
                 <thead>
                   <tr className="bg-slate-100/90 text-slate-950 font-bold border-b border-slate-900">
-                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[6%]">Sl.No</th>
-                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[46%]">Description</th>
-                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[16%]">PO</th>
-                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[10%]">Qty</th>
-                    <th className="border-r border-slate-900 py-1 px-2 text-center w-[11%]">Rate</th>
-                    <th className="py-1 px-2 text-center w-[11%]">TOTAL</th>
+                    <th className="border-r border-slate-900 py-1.5 px-2 text-center w-[6%]">Sl.No</th>
+                    <th className="border-r border-slate-900 py-1.5 px-2 text-center w-[46%]">Description</th>
+                    <th className="border-r border-slate-900 py-1.5 px-2 text-center w-[16%]">PO</th>
+                    <th className="border-r border-slate-900 py-1.5 px-2 text-center w-[10%]">Qty</th>
+                    <th className="border-r border-slate-900 py-1.5 px-2 text-center w-[11%]">Rate</th>
+                    <th className="py-1.5 px-2 text-center w-[11%]">TOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoiceData.items.map((item: InvoiceItem, idx: number) => (
+                  {invoice.items.map((item, idx) => (
                     <tr key={item.id || idx} className="border-b border-slate-300 min-h-[36px]">
                       <td className="border-r border-slate-900 p-2 text-center align-top font-medium">
-                        {item.itemNo || idx + 1}
+                        {item.serialNumber || idx + 1}
                       </td>
                       <td className="border-r border-slate-900 p-2 align-top text-left font-medium text-slate-900 whitespace-pre-line leading-snug">
                         {item.description}
                       </td>
                       <td className="border-r border-slate-900 p-2 text-center align-top text-[10px] font-semibold text-slate-800 break-words">
-                        {item.poRef || invoiceData.purchaseOrderNumber || "-"}
+                        {item.poReference || invoice.poNumber || "-"}
                       </td>
                       <td className="border-r border-slate-900 p-2 text-center align-top font-semibold">
-                        {item.quantity}
+                        {item.quantity} {item.unit ? <span className="text-[10px] text-slate-600 block">{item.unit}</span> : null}
                       </td>
                       <td className="border-r border-slate-900 p-2 text-right align-top whitespace-nowrap">
                         <span className="text-[9px] text-slate-600 mr-1">{currency}</span>
-                        <span className="font-medium">{(Number(item.unitPrice) || 0).toFixed(3)}</span>
+                        <span className="font-medium">{formatOMR(item.rate)}</span>
                       </td>
                       <td className="p-2 text-right align-top whitespace-nowrap font-semibold">
                         <span className="text-[9px] text-slate-600 mr-1">{currency}</span>
-                        <span>{((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toFixed(3)}</span>
+                        <span>{formatOMR(item.amount)}</span>
                       </td>
                     </tr>
                   ))}
 
-                  {/* Empty rows filler if few items to maintain traditional Oman invoice look */}
-                  {invoiceData.items.length < 3 && (
-                    <tr style={{ height: `${(3 - invoiceData.items.length) * 45}px` }}>
+                  {/* Filler rows to ensure authentic invoice height */}
+                  {invoice.items.length < 3 && (
+                    <tr style={{ height: `${(3 - invoice.items.length) * 45}px` }}>
                       <td className="border-r border-slate-900"></td>
                       <td className="border-r border-slate-900"></td>
                       <td className="border-r border-slate-900"></td>
@@ -175,54 +179,54 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
                 </tbody>
               </table>
 
-              {/* Totals Table directly beneath */}
+              {/* Totals Table */}
               <div className="flex justify-end border-x border-b border-slate-900 bg-white">
                 <div className="w-[45%] text-[10px] leading-tight">
                   <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
                     <span className="font-semibold text-slate-800">Sub Total</span>
                     <span className="font-semibold">
-                      {currency} {subtotal.toFixed(3)}
+                      {currency} {formatOMR(invoice.subtotal)}
                     </span>
                   </div>
-                  {invoiceData.discount > 0 && (
+                  {invoice.discount > 0 && (
                     <div className="flex justify-between border-b border-slate-300 px-2.5 py-1 text-red-600">
                       <span className="font-semibold">Discount</span>
                       <span className="font-semibold">
-                        -{currency} {(Number(invoiceData.discount) || 0).toFixed(3)}
+                        -{currency} {formatOMR(invoice.discount)}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
                     <span className="font-semibold text-slate-800">Taxable Value</span>
                     <span className="font-semibold">
-                      {currency} {taxableValue.toFixed(3)}
+                      {currency} {formatOMR(invoice.taxableValue)}
                     </span>
                   </div>
                   <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
-                    <span className="font-semibold text-slate-800">Value Added Tax 5 %</span>
+                    <span className="font-semibold text-slate-800">Value Added Tax {invoice.vatRate}%</span>
                     <span className="font-semibold">
-                      {currency} {totalTax.toFixed(3)}
+                      {currency} {formatOMR(invoice.vatAmount)}
                     </span>
                   </div>
                   <div className="flex justify-between border-b border-slate-300 px-2.5 py-1">
                     <span className="font-semibold text-slate-800">Value of the Tax due</span>
                     <span className="font-semibold">
-                      {currency} {totalTax.toFixed(3)}
+                      {currency} {formatOMR(invoice.vatAmount)}
                     </span>
                   </div>
                   <div className="flex justify-between bg-slate-100 px-2.5 py-1.5 font-bold text-[11px] text-slate-950">
                     <span>TOTAL</span>
                     <span>
-                      {currency} {grandTotal.toFixed(3)}
+                      {currency} {formatOMR(invoice.total)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Amount In Words Row */}
+              {/* In Words Row */}
               <div className="border-x border-b border-slate-900 px-3 py-1.5 bg-slate-50/70 text-[10.5px]">
                 <span className="font-bold text-slate-950">In Words : </span>
-                <span className="font-semibold text-slate-900">{amountWords}</span>
+                <span className="font-semibold text-slate-900">{invoice.amountInWords}</span>
               </div>
             </div>
 
@@ -236,37 +240,37 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">Bank Name</span>
                   <span className="col-span-7 font-semibold text-slate-950">
-                    : {invoiceData.bankName || "Sohar International"}
+                    : {invoice.bankDetailsSnapshot?.bankName || "Sohar International"}
                   </span>
                 </div>
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">Company Name</span>
                   <span className="col-span-7 font-semibold text-slate-950">
-                    : {invoiceData.companyName || "Golden Hornet LLC"}
+                    : {invoice.bankDetailsSnapshot?.companyName || "Golden Hornet LLC"}
                   </span>
                 </div>
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">Account Number</span>
                   <span className="col-span-7 font-bold text-slate-950">
-                    : {invoiceData.bankAccount || "001030002918"}
+                    : {invoice.bankDetailsSnapshot?.accountNumber || "001030002918"}
                   </span>
                 </div>
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">Swift Code</span>
                   <span className="col-span-7 font-semibold text-slate-950">
-                    : {invoiceData.bankSwift || "BSHROMRU"}
+                    : {invoice.bankDetailsSnapshot?.swiftCode || "BSHROMRU"}
                   </span>
                 </div>
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">IBAN</span>
                   <span className="col-span-7 font-semibold text-slate-950">
-                    : {invoiceData.bankIban || "OM210300000001030002918"}
+                    : {invoice.bankDetailsSnapshot?.iban || "OM210300000001030002918"}
                   </span>
                 </div>
                 <div className="grid grid-cols-12">
                   <span className="col-span-5 text-slate-700">Branch</span>
                   <span className="col-span-7 font-semibold text-slate-950">
-                    : {invoiceData.bankBranch || "CBD"}
+                    : {invoice.bankDetailsSnapshot?.branch || "CBD"}
                   </span>
                 </div>
               </div>
@@ -275,11 +279,11 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
               <div className="col-span-6 text-center text-[10.5px] p-2 border border-dashed border-slate-400 bg-slate-50/50 rounded-xs">
                 <span className="font-bold text-slate-900">Payment Terms: </span>
                 <span className="text-slate-800 font-medium">
-                  {invoiceData.paymentTerms || "30 Days After Submission of the invoice."}
+                  {invoice.paymentTerms || "30 Days After Submission of the invoice."}
                 </span>
-                {invoiceData.notes && (
+                {invoice.notes && (
                   <div className="mt-1 text-[9.5px] text-slate-600 italic">
-                    {invoiceData.notes}
+                    {invoice.notes}
                   </div>
                 )}
               </div>
@@ -295,13 +299,12 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
 
               {/* Official Round Stamp */}
               <div className="flex flex-col items-center justify-center h-24">
-                {invoiceData.showStamp !== false ? (
+                {invoice.enableStamp && stampUrl ? (
                   <div className="relative h-20 w-20 transform -rotate-3 hover:rotate-0 transition-transform">
-                    <Image
-                      src="/images/stamp.png"
+                    <img
+                      src={stampUrl}
                       alt="Golden Hornet Official Stamp"
-                      fill
-                      className="object-contain"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                 ) : (
@@ -314,13 +317,12 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
               {/* Authorized Signatory */}
               <div className="flex flex-col items-center justify-end h-24 pb-1">
                 <span className="font-bold text-slate-950 mb-0.5">For Golden Hornet LLC</span>
-                {invoiceData.showSignature !== false ? (
+                {invoice.enableSignature && signatureUrl ? (
                   <div className="relative h-12 w-28 my-0.5">
-                    <Image
-                      src="/images/signature.png"
+                    <img
+                      src={signatureUrl}
                       alt="Authorized Signature"
-                      fill
-                      className="object-contain"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                 ) : (
@@ -336,18 +338,6 @@ export function InvoicePreview({ invoiceData, documentTitle = "TAX INVOICE" }: I
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Bottom Golden Hornet Letterhead Footer Banner */}
-      <div className="w-full mt-auto">
-        <Image
-          src="/images/gh_footer.png"
-          alt="Golden Hornet Footer"
-          width={1190}
-          height={110}
-          className="w-full h-auto object-contain block"
-          priority
-        />
       </div>
     </div>
   )
