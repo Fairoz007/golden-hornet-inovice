@@ -1,0 +1,9 @@
+43 0 46 68 42 119 41 182 37 236 38 327 39 563 40 586 44 601 <</P 42 0 R/S/InlineShape/Alt() /Type/StructElem/K[ 0] /Pg 3 0 R>>
+<</P 42 0 R/S/Span/Type/StructElem/Pg 3 0 R/K 1>>
+<</P 41 0 R/S/P/Type/StructElem/K[ 43 0 R 46 0 R] /Pg 3 0 R>>
+<</P 37 0 R/S/Document/Type/StructElem/K[ 42 0 R] >>
+<</Type/StructTreeRoot/RoleMap 38 0 R/ParentTree 39 0 R/K[ 41 0 R] /ParentTreeNextKey 1>>
+<</Footnote/Note/Endnote/Note/Textbox/Sect/Header/Sect/Footer/Sect/InlineShape/Sect/Annotation/Sect/Artifact/Sect/Workbook/Document/Worksheet/Part/Macrosheet/Part/Chartsheet/Part/Dialogsheet/Part/Slide/Part/Chart/Sect/Diagram/Figure>>
+<</Nums[ 0 44 0 R] >>
+<</Names[] >>
+[ 43 0 R 46 0 R] 
