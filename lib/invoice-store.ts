@@ -30,7 +30,7 @@ export interface InvoiceItem {
   amount: number
 }
 
-export type InvoiceStatus = "Draft" | "Finalized" | "Paid" | "Cancelled"
+export type InvoiceStatus = "Draft" | "Finalized" | "Paid" | "Partially Paid" | "Cancelled"
 
 export interface InvoiceRecord {
   id: string
@@ -55,6 +55,7 @@ export interface InvoiceRecord {
   vatRate: number
   vatAmount: number
   total: number
+  paidAmount?: number
   amountInWords: string
   paymentTerms: string
   bankDetailsSnapshot: {
@@ -398,6 +399,36 @@ const INITIAL_INVOICES: InvoiceRecord[] = [
   },
 ]
 
+// A sizeable but deterministic offline dataset keeps the demo useful without a database.
+const DEMO_CUSTOMERS: Customer[] = [
+  ...INITIAL_CUSTOMERS,
+  ...Array.from({ length: 7 }, (_, index) => ({
+    id: `cust-${index + 4}`,
+    companyName: ["Al Noor Trading LLC", "Muscat Infrastructure SAOC", "Sohar Logistics Co.", "Oman Solar Systems", "Gulf Marine Services", "Rusayl Manufacturing", "Nizwa Building Materials"][index],
+    poBox: `P.O. Box ${220 + index}, Oman`, address: `${["Al Khuwair", "Al Hail", "Sohar", "Barka", "Muttrah", "Rusayl", "Nizwa"][index]} Commercial Area`, city: "Sultanate of Oman",
+    vatin: `OM11000${32000 + index}`, phone: `+968 24${String(500000 + index * 911).slice(0, 6)}`, email: `accounts${index + 4}@goldenhornet.demo`, notes: "Offline demo customer.", createdAt: Date.now() - (index + 10) * 86400000, updatedAt: Date.now() - (index + 10) * 86400000,
+  })),
+]
+
+const DEMO_INVOICES: InvoiceRecord[] = (() => {
+  const seed = INITIAL_INVOICES
+  const generated: InvoiceRecord[] = []
+  const customers = DEMO_CUSTOMERS
+  const today = new Date()
+  for (let monthOffset = 0; monthOffset < 36; monthOffset++) {
+    const monthDate = new Date(today.getFullYear(), today.getMonth() - monthOffset, 15)
+    for (let sequence = 0; sequence < 100; sequence++) {
+      const customer = customers[(monthOffset * 100 + sequence) % customers.length]
+      const total = Math.round((180 + ((sequence * 73 + monthOffset * 41) % 6800)) * 1.05 * 1000) / 1000
+      const status: InvoiceStatus = sequence % 11 === 0 ? "Partially Paid" : sequence % 4 === 0 ? "Paid" : sequence % 7 === 0 ? "Draft" : "Finalized"
+      const paidAmount = status === "Paid" ? total : status === "Partially Paid" ? Math.round(total * (0.25 + (sequence % 4) * 0.1) * 1000) / 1000 : 0
+      const date = monthDate.toISOString().slice(0, 10)
+      generated.push({ ...seed[0], id: `demo-${monthDate.getFullYear()}-${monthDate.getMonth()}-${sequence}`, invoiceNumber: `${3000 + monthOffset * 100 + sequence}-${monthDate.getFullYear()}`, invoiceDate: date, dueDate: new Date(monthDate.getTime() + 30 * 86400000).toISOString().slice(0, 10), customerId: customer.id, customerSnapshot: { companyName: customer.companyName, poBox: customer.poBox, address: customer.address, city: customer.city, vatin: customer.vatin, phone: customer.phone, email: customer.email }, poNumber: `DEMO-${monthDate.getFullYear()}-${String(sequence + 1).padStart(3, "0")}`, subtotal: Math.round((total / 1.05) * 1000) / 1000, taxableValue: Math.round((total / 1.05) * 1000) / 1000, vatAmount: Math.round((total - total / 1.05) * 1000) / 1000, total, paidAmount, status, createdAt: monthDate.getTime(), updatedAt: monthDate.getTime(), finalizedAt: status === "Draft" ? undefined : monthDate.getTime() })
+    }
+  }
+  return [...seed, ...generated]
+})()
+
 const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
   {
     id: "log-1",
@@ -461,12 +492,22 @@ const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
 ]
 
 class InvoiceStore {
-  private static STORAGE_KEY_INVOICES = "gh:invoices:v1"
-  private static STORAGE_KEY_CUSTOMERS = "gh:customers:v1"
+  private static STORAGE_KEY_INVOICES = "gh:invoices:v2"
+  private static STORAGE_KEY_CUSTOMERS = "gh:customers:v2"
   private static STORAGE_KEY_SETTINGS = "gh:settings:v1"
   private static STORAGE_KEY_AUDIT = "gh:audit:v1"
 
   private listeners: Set<() => void> = new Set()
+
+  /** Restore the bundled demo dataset. No network, database, or authentication is involved. */
+  resetDemoData(): void {
+    if (typeof window === "undefined") return
+    localStorage.removeItem(InvoiceStore.STORAGE_KEY_INVOICES)
+    localStorage.removeItem(InvoiceStore.STORAGE_KEY_CUSTOMERS)
+    localStorage.removeItem(InvoiceStore.STORAGE_KEY_SETTINGS)
+    localStorage.removeItem(InvoiceStore.STORAGE_KEY_AUDIT)
+    this.notify()
+  }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
@@ -548,12 +589,15 @@ class InvoiceStore {
     if (typeof window === "undefined") return INITIAL_CUSTOMERS
     try {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_CUSTOMERS)
-      if (stored) return JSON.parse(stored)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
     } catch (e) {
       console.error(e)
     }
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_CUSTOMERS, JSON.stringify(INITIAL_CUSTOMERS))
-    return INITIAL_CUSTOMERS
+    localStorage.setItem(InvoiceStore.STORAGE_KEY_CUSTOMERS, JSON.stringify(DEMO_CUSTOMERS))
+    return DEMO_CUSTOMERS
   }
 
   createCustomer(data: Omit<Customer, "id" | "createdAt" | "updatedAt">): Customer {
@@ -634,12 +678,15 @@ class InvoiceStore {
     if (typeof window === "undefined") return INITIAL_INVOICES
     try {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_INVOICES)
-      if (stored) return JSON.parse(stored)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
     } catch (e) {
       console.error(e)
     }
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(INITIAL_INVOICES))
-    return INITIAL_INVOICES
+    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(DEMO_INVOICES))
+    return DEMO_INVOICES
   }
 
   getInvoiceById(id: string): InvoiceRecord | undefined {
@@ -862,6 +909,19 @@ class InvoiceStore {
       description: `Invoice ${existing.invoiceNumber} marked as Paid.`,
     })
 
+    this.notify()
+    return updatedInvoice
+  }
+
+  markInvoicePartiallyPaid(id: string, paidAmount: number): InvoiceRecord {
+    const invoices = this.getInvoices()
+    const existing = invoices.find((i) => i.id === id)
+    if (!existing) throw new Error("Invoice not found")
+    if (existing.status === "Cancelled") throw new Error("Cannot record payment on a cancelled invoice.")
+    const amount = Math.min(existing.total, Math.max(0, Number(paidAmount) || 0))
+    const updatedInvoice: InvoiceRecord = { ...existing, paidAmount: amount, status: amount >= existing.total ? "Paid" : "Partially Paid", updatedAt: Date.now() }
+    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(invoices.map((i) => i.id === id ? updatedInvoice : i)))
+    this.addAuditLog({ action: amount >= existing.total ? "INVOICE_MARKED_PAID" : "INVOICE_PARTIALLY_PAID", entityType: "invoice", entityId: id, invoiceNumber: existing.invoiceNumber, previousValues: { status: existing.status, paidAmount: existing.paidAmount || 0 }, newValues: { status: updatedInvoice.status, paidAmount: amount }, changedFields: ["status", "paidAmount"], description: `Invoice ${existing.invoiceNumber} payment updated to ${amount.toFixed(3)} OMR.` })
     this.notify()
     return updatedInvoice
   }

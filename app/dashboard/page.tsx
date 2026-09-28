@@ -1,7 +1,7 @@
 "use client"
 
-import { InvoicesLedger } from "@/components/invoices-ledger"
+import { FinanceDashboard } from "@/components/finance-dashboard"
 
 export default function DashboardPage() {
-  return <InvoicesLedger />
+  return <FinanceDashboard />
 }

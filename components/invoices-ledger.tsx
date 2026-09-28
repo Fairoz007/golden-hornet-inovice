@@ -44,6 +44,7 @@ export function InvoicesLedger() {
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [page, setPage] = useState(1)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null)
   const [cancelReason, setCancelReason] = useState("")
@@ -90,6 +91,10 @@ export function InvoicesLedger() {
       return true
     })
   }, [invoices, search, statusFilter, startDate, endDate])
+  const pageSize = 50
+  const pageCount = Math.max(1, Math.ceil(filteredInvoices.length / pageSize))
+  const visibleInvoices = filteredInvoices.slice((page - 1) * pageSize, page * pageSize)
+  useEffect(() => setPage(1), [search, statusFilter, startDate, endDate])
 
   const handleFinalize = (id: string) => {
     try {
@@ -154,6 +159,8 @@ export function InvoicesLedger() {
         return <Badge className="bg-blue-600 text-white hover:bg-blue-700">Finalized</Badge>
       case "Paid":
         return <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">Paid</Badge>
+      case "Partially Paid":
+        return <Badge className="bg-amber-500 text-white hover:bg-amber-600">Partially Paid</Badge>
       case "Cancelled":
         return <Badge className="bg-red-600 text-white hover:bg-red-700">Cancelled</Badge>
       default:
@@ -208,7 +215,7 @@ export function InvoicesLedger() {
 
             {/* Status Filter Tabs */}
             <div className="md:col-span-4 flex items-center gap-1 overflow-x-auto">
-              {["All", "Draft", "Finalized", "Paid", "Cancelled"].map((st) => (
+              {["All", "Draft", "Finalized", "Paid", "Partially Paid", "Cancelled"].map((st) => (
                 <button
                   key={st}
                   type="button"
@@ -263,7 +270,7 @@ export function InvoicesLedger() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInvoices.map((inv) => (
+                {visibleInvoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-amber-50/30 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
                       <Link
@@ -392,6 +399,7 @@ export function InvoicesLedger() {
               </tbody>
             </table>
           </div>
+          {filteredInvoices.length > pageSize && <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500"><span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredInvoices.length)} of {filteredInvoices.length}</span><div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</Button><Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</Button></div></div>}
         </div>
       </main>
 

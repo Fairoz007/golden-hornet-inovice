@@ -1,7 +1,5 @@
-"use client"
-
-import { InvoicesLedger } from "@/components/invoices-ledger"
+import { redirect } from "next/navigation"
 
 export default function RootPage() {
-  return <InvoicesLedger />
+  redirect("/dashboard")
 }
