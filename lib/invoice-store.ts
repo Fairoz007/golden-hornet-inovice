@@ -591,7 +591,7 @@ class InvoiceStore {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_CUSTOMERS)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) return [...DEMO_INVOICES, ...parsed]
       }
     } catch (e) {
       console.error(e)
@@ -680,13 +680,30 @@ class InvoiceStore {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_INVOICES)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) return [...DEMO_INVOICES, ...parsed]
       }
     } catch (e) {
       console.error(e)
     }
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(DEMO_INVOICES))
+    // The generated demo portfolio is intentionally kept in memory. Serializing
+    // thousands of rich invoice snapshots exceeds typical browser storage quotas.
     return DEMO_INVOICES
+  }
+
+  private persistInvoices(invoices: InvoiceRecord[]): void {
+    if (typeof window === "undefined") return
+    // Demo rows are deterministic and regenerated on demand. Persist only
+    // user-created rows, keeping localStorage small and reliable.
+    const customInvoices = invoices.filter((invoice) => !invoice.id.startsWith("demo-"))
+    try {
+      localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(customInvoices))
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "QuotaExceededError") {
+        console.warn("Invoice cache quota reached; keeping the demo portfolio in memory.")
+        return
+      }
+      throw error
+    }
   }
 
   getInvoiceById(id: string): InvoiceRecord | undefined {
@@ -760,7 +777,7 @@ class InvoiceStore {
     }
 
     const updated = [newInvoice, ...invoices]
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updated))
+    this.persistInvoices(updated)
 
     this.addAuditLog({
       action: invoiceData.finalizeImmediately ? "INVOICE_FINALIZED" : "INVOICE_CREATED",
@@ -823,7 +840,7 @@ class InvoiceStore {
     }
 
     const updatedList = invoices.map((i) => (i.id === id ? updatedInvoice : i))
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updatedList))
+    this.persistInvoices(updatedList)
 
     this.addAuditLog({
       action: "INVOICE_EDITED",
@@ -863,7 +880,7 @@ class InvoiceStore {
     }
 
     const updatedList = invoices.map((i) => (i.id === id ? updatedInvoice : i))
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updatedList))
+    this.persistInvoices(updatedList)
 
     this.addAuditLog({
       action: "INVOICE_FINALIZED",
@@ -896,7 +913,7 @@ class InvoiceStore {
     }
 
     const updatedList = invoices.map((i) => (i.id === id ? updatedInvoice : i))
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updatedList))
+    this.persistInvoices(updatedList)
 
     this.addAuditLog({
       action: "INVOICE_MARKED_PAID",
@@ -920,7 +937,7 @@ class InvoiceStore {
     if (existing.status === "Cancelled") throw new Error("Cannot record payment on a cancelled invoice.")
     const amount = Math.min(existing.total, Math.max(0, Number(paidAmount) || 0))
     const updatedInvoice: InvoiceRecord = { ...existing, paidAmount: amount, status: amount >= existing.total ? "Paid" : "Partially Paid", updatedAt: Date.now() }
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(invoices.map((i) => i.id === id ? updatedInvoice : i)))
+    this.persistInvoices(invoices.map((i) => i.id === id ? updatedInvoice : i))
     this.addAuditLog({ action: amount >= existing.total ? "INVOICE_MARKED_PAID" : "INVOICE_PARTIALLY_PAID", entityType: "invoice", entityId: id, invoiceNumber: existing.invoiceNumber, previousValues: { status: existing.status, paidAmount: existing.paidAmount || 0 }, newValues: { status: updatedInvoice.status, paidAmount: amount }, changedFields: ["status", "paidAmount"], description: `Invoice ${existing.invoiceNumber} payment updated to ${amount.toFixed(3)} OMR.` })
     this.notify()
     return updatedInvoice
@@ -939,7 +956,7 @@ class InvoiceStore {
     }
 
     const updatedList = invoices.map((i) => (i.id === id ? updatedInvoice : i))
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updatedList))
+    this.persistInvoices(updatedList)
 
     this.addAuditLog({
       action: "INVOICE_CANCELLED",
@@ -978,7 +995,7 @@ class InvoiceStore {
     }
 
     const updated = [newInvoice, ...invoices]
-    localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(updated))
+    this.persistInvoices(updated)
 
     this.addAuditLog({
       action: "INVOICE_DUPLICATED",
