@@ -35,3 +35,7 @@ Mandatory A–H tests cover no-invoice advances, partial/split/full settlements,
 The new Convex backend is schema/type/handler tested but no `CONVEX_DEPLOYMENT` is configured. The active UI stores data in this browser's localStorage. Before production or multi-user use, configure an authenticated deployment, connect a hosted adapter, and migrate validated opening/receipt evidence. LocalStorage is not an authenticated accounting database or backup service. OMR is the supported accounting currency; foreign-currency receipts require an explicit exchange-rate policy.
 
 See `docs/FINANCE-AUDIT.md` for the original architecture findings and `docs/CONVEX_FINANCE.md` for backend setup and safeguards.
+
+### Local dummy finance data
+
+Opening the dashboard, finance module or customer workspace seeds synthetic receipts, advances (including a customer without invoices), unallocated payments, opening settlements, credit/debit notes, a reversal, expenses and customer documents once. All data stays in localStorage; no database or network is used. Existing records are preserved. Demo references are prefixed `DEMO-`; repeated initialization does not duplicate financial postings.

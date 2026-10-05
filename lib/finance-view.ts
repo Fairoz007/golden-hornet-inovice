@@ -1,11 +1,12 @@
 "use client"
 import { useEffect, useState } from "react"
 import { accountDocuments } from "./account-documents"
+import { ensureFinanceDemo } from "./finance-demo"
 import { financeStore } from "./finance-store"
 import type { FinanceSnapshot } from "./finance-engine"
 export function useFinance() {
   const [snapshot, setSnapshot] = useState<FinanceSnapshot | null>(null)
-  useEffect(() => { const sync = () => setSnapshot(financeStore.getSnapshot()); sync(); const unsubscribe = financeStore.subscribe(sync); const offRecords = accountDocuments.subscribe(sync); window.addEventListener("storage", sync); return () => { unsubscribe(); offRecords(); window.removeEventListener("storage", sync) } }, [])
+  useEffect(() => { ensureFinanceDemo(); const sync = () => setSnapshot(financeStore.getSnapshot()); sync(); const unsubscribe = financeStore.subscribe(sync); const offRecords = accountDocuments.subscribe(sync); window.addEventListener("storage", sync); return () => { unsubscribe(); offRecords(); window.removeEventListener("storage", sync) } }, [])
   return snapshot
 }
 export function exportCsv(name: string, headers: string[], rows: unknown[][]) {

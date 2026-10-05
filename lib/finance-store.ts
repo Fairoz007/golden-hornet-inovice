@@ -27,7 +27,8 @@ class FinanceStore {
    changed=true
   }
   const legacyIds=new Set(state.payments.filter(p=>p.legacy).map(p=>p.id));state.payments=state.payments.filter(p=>!p.legacy);state.allocations=state.allocations.filter(a=>!legacyIds.has(a.paymentId))
-  for(const i of invoices){if(state.migrated.includes(i.id))continue;state.migrated.push(i.id);changed=true;const paid=i.status==='Paid'?i.total:(i.paidAmount||0);if(paid>0&&i.customerId&&i.status!=='Draft'&&i.status!=='Cancelled'){const id=`legacy-settlement-${i.id}`;if(!state.transactions.some(t=>t.id===id))state.transactions.push({id,customerId:i.customerId,date:i.invoiceDate,type:'adjustment',amount:-paid,invoiceId:i.id,reference:`LEGACY-${i.invoiceNumber}`,description:'Migrated historical invoice settlement; receipt date/method unverified. Not counted as cash received.',createdAt:i.createdAt})}}
+  const migratedIds=new Set(state.migrated)
+  for(const i of invoices){if(migratedIds.has(i.id))continue;state.migrated.push(i.id);migratedIds.add(i.id);changed=true;const paid=i.status==='Paid'?i.total:(i.paidAmount||0);if(paid>0&&i.customerId&&i.status!=='Draft'&&i.status!=='Cancelled'){const id=`legacy-settlement-${i.id}`;if(!state.transactions.some(t=>t.id===id))state.transactions.push({id,customerId:i.customerId,date:i.invoiceDate,type:'adjustment',amount:-paid,invoiceId:i.id,reference:`LEGACY-${i.invoiceNumber}`,description:'Migrated historical invoice settlement; receipt date/method unverified. Not counted as cash received.',createdAt:i.createdAt})}}
   if(changed){if(typeof window!=='undefined')localStorage.setItem(KEY,JSON.stringify(state));else this.memory=state}
   return Object.freeze({customers:invoiceStore.getCustomers().map(c=>({...c,accountStatus:accountDocuments.getProfile(c.id).accountStatus||"Active"})),invoices,...state})
  }
