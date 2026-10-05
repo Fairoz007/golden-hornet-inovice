@@ -1,10 +1,13 @@
 "use client"
 
+import { financeStore } from "./finance-store"
+import { invoiceBalance, toBaisa } from "./finance-engine"
 import { calculateInvoiceFinancials, roundOMR } from "./financial-calculator"
 import { amountToWordsOMR } from "./number-to-words"
 import { GOLDEN_HORNET_COMPANY } from "./dummy-data"
 
 export interface Customer {
+  accountStatus?: string
   id: string
   companyName: string
   poBox?: string
@@ -129,7 +132,7 @@ export interface AuditLogEntry {
   id: string
   timestamp: number
   action: string
-  entityType: "invoice" | "customer" | "settings" | "asset"
+  entityType: "invoice" | "customer" | "settings" | "asset" | "payment" | "transaction" | "expense"
   entityId: string
   invoiceNumber?: string
   user?: string
@@ -506,6 +509,7 @@ class InvoiceStore {
     localStorage.removeItem(InvoiceStore.STORAGE_KEY_CUSTOMERS)
     localStorage.removeItem(InvoiceStore.STORAGE_KEY_SETTINGS)
     localStorage.removeItem(InvoiceStore.STORAGE_KEY_AUDIT)
+    financeStore.reset()
     this.notify()
   }
 
@@ -591,7 +595,7 @@ class InvoiceStore {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_CUSTOMERS)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return [...DEMO_INVOICES, ...parsed]
+        if (Array.isArray(parsed)) return parsed.filter((c: Customer) => typeof c.companyName === "string" && !c.id.startsWith("demo-"))
       }
     } catch (e) {
       console.error(e)
@@ -649,6 +653,8 @@ class InvoiceStore {
   deleteCustomer(id: string): { success: boolean; message?: string } {
     const invoices = this.getInvoices()
     const linked = invoices.filter((i) => i.customerId === id)
+    const finance = financeStore.getSnapshot()
+    if (finance.payments.some(p => p.customerId === id) || finance.transactions.some(t => t.customerId === id)) throw new Error("Cannot delete customer with financial history")
     if (linked.length > 0) {
       throw new Error(
         `Cannot delete customer: "${linked.length}" linked invoice(s) exist. Historical invoices must remain intact.`
@@ -680,7 +686,7 @@ class InvoiceStore {
       const stored = localStorage.getItem(InvoiceStore.STORAGE_KEY_INVOICES)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return [...DEMO_INVOICES, ...parsed]
+        if (Array.isArray(parsed)) { const ids = new Set(parsed.map((i: InvoiceRecord) => i.id)); return [...parsed, ...DEMO_INVOICES.filter(i => !ids.has(i.id))] }
       }
     } catch (e) {
       console.error(e)
@@ -694,7 +700,7 @@ class InvoiceStore {
     if (typeof window === "undefined") return
     // Demo rows are deterministic and regenerated on demand. Persist only
     // user-created rows, keeping localStorage small and reliable.
-    const customInvoices = invoices.filter((invoice) => !invoice.id.startsWith("demo-"))
+    const customInvoices = invoices.filter(invoice => !invoice.id.startsWith("demo-") || JSON.stringify(invoice) !== JSON.stringify(DEMO_INVOICES.find(seed => seed.id === invoice.id)))
     try {
       localStorage.setItem(InvoiceStore.STORAGE_KEY_INVOICES, JSON.stringify(customInvoices))
     } catch (error) {
@@ -707,7 +713,11 @@ class InvoiceStore {
   }
 
   getInvoiceById(id: string): InvoiceRecord | undefined {
-    return this.getInvoices().find((i) => i.id === id)
+    const snapshot = financeStore.getSnapshot()
+    const invoice = snapshot.invoices.find(i => i.id === id)
+    if (!invoice || invoice.status === "Draft" || invoice.status === "Cancelled") return invoice
+    const balance = invoiceBalance(snapshot, id)
+    return { ...invoice, paidAmount: roundOMR(invoice.total - balance), status: balance === 0 ? "Paid" : balance < invoice.total ? "Partially Paid" : "Finalized" }
   }
 
   getNextInvoiceNumber(): string {
@@ -741,6 +751,7 @@ class InvoiceStore {
   ): InvoiceRecord {
     const invoices = this.getInvoices()
 
+    if (invoiceData.finalizeImmediately && (!invoiceData.customerId || !this.getCustomers().some(c => c.id === invoiceData.customerId))) throw new Error("Select a registered customer before posting an invoice")
     // Uniqueness validation
     if (invoices.some((i) => i.invoiceNumber === invoiceData.invoiceNumber)) {
       throw new Error(`Invoice number "${invoiceData.invoiceNumber}" already exists.`)
@@ -754,7 +765,7 @@ class InvoiceStore {
         taxRate: it.taxRate,
       })),
       invoiceData.discount,
-      invoiceData.vatRate || 5
+      invoiceData.vatRate ?? 5
     )
 
     const now = Date.now()
@@ -870,6 +881,7 @@ class InvoiceStore {
     if (existing.status !== "Draft") {
       throw new Error(`Invoice is already ${existing.status}`)
     }
+    if (!existing.customerId || !this.getCustomers().some(c => c.id === existing.customerId)) throw new Error("Select a registered customer before posting an invoice")
 
     const now = Date.now()
     const updatedInvoice: InvoiceRecord = {
@@ -897,57 +909,15 @@ class InvoiceStore {
     return updatedInvoice
   }
 
-  markInvoicePaid(id: string): InvoiceRecord {
-    const invoices = this.getInvoices()
-    const existing = invoices.find((i) => i.id === id)
-    if (!existing) throw new Error("Invoice not found")
-    if (existing.status === "Cancelled") {
-      throw new Error("Cannot mark a cancelled invoice as paid.")
-    }
-
-    const now = Date.now()
-    const updatedInvoice: InvoiceRecord = {
-      ...existing,
-      status: "Paid",
-      updatedAt: now,
-    }
-
-    const updatedList = invoices.map((i) => (i.id === id ? updatedInvoice : i))
-    this.persistInvoices(updatedList)
-
-    this.addAuditLog({
-      action: "INVOICE_MARKED_PAID",
-      entityType: "invoice",
-      entityId: id,
-      invoiceNumber: existing.invoiceNumber,
-      previousValues: { status: existing.status },
-      newValues: { status: "Paid" },
-      changedFields: ["status"],
-      description: `Invoice ${existing.invoiceNumber} marked as Paid.`,
-    })
-
-    this.notify()
-    return updatedInvoice
-  }
-
-  markInvoicePartiallyPaid(id: string, paidAmount: number): InvoiceRecord {
-    const invoices = this.getInvoices()
-    const existing = invoices.find((i) => i.id === id)
-    if (!existing) throw new Error("Invoice not found")
-    if (existing.status === "Cancelled") throw new Error("Cannot record payment on a cancelled invoice.")
-    const amount = Math.min(existing.total, Math.max(0, Number(paidAmount) || 0))
-    const updatedInvoice: InvoiceRecord = { ...existing, paidAmount: amount, status: amount >= existing.total ? "Paid" : "Partially Paid", updatedAt: Date.now() }
-    this.persistInvoices(invoices.map((i) => i.id === id ? updatedInvoice : i))
-    this.addAuditLog({ action: amount >= existing.total ? "INVOICE_MARKED_PAID" : "INVOICE_PARTIALLY_PAID", entityType: "invoice", entityId: id, invoiceNumber: existing.invoiceNumber, previousValues: { status: existing.status, paidAmount: existing.paidAmount || 0 }, newValues: { status: updatedInvoice.status, paidAmount: amount }, changedFields: ["status", "paidAmount"], description: `Invoice ${existing.invoiceNumber} payment updated to ${amount.toFixed(3)} OMR.` })
-    this.notify()
-    return updatedInvoice
-  }
+  markInvoicePaid(_id: string): InvoiceRecord { throw new Error("Record an actual receipt in Finance → Payments with date, method and reference") }
+  markInvoicePartiallyPaid(_id: string, _paidAmount: number): InvoiceRecord { throw new Error("Record an actual receipt and allocation in Finance → Payments") }
 
   cancelInvoice(id: string, reason?: string): InvoiceRecord {
     const invoices = this.getInvoices()
     const existing = invoices.find((i) => i.id === id)
     if (!existing) throw new Error("Invoice not found")
 
+    if (financeStore.getSnapshot().allocations.some(a => a.invoiceId === id) || financeStore.getSnapshot().transactions.some(t => t.invoiceId === id)) throw new Error("Reverse allocated payments before cancelling an invoice")
     const now = Date.now()
     const updatedInvoice: InvoiceRecord = {
       ...existing,
@@ -989,6 +959,7 @@ class InvoiceStore {
       invoiceDate: today,
       dueDate: due,
       status: "Draft",
+      paidAmount: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       finalizedAt: undefined,
@@ -1024,6 +995,12 @@ class InvoiceStore {
       invoiceNumber: invoice?.invoiceNumber,
       description,
     })
+    this.notify()
+  }
+
+  logFinanceActivity(action: string, entityType: "payment" | "transaction" | "expense", entityId: string, description: string, newValues?: unknown) {
+    if (typeof window === "undefined") return
+    this.addAuditLog({ action, entityType, entityId, description, newValues })
     this.notify()
   }
 

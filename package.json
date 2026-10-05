@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "echo 'No lint required'"
+    "lint": "echo 'No lint required'",
+    "typecheck": "tsc --noEmit && tsc -p convex/tsconfig.json --noEmit",
+    "test:finance": "node scripts/test-finance.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

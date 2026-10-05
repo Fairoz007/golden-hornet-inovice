@@ -36,6 +36,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { invoiceStore, type InvoiceRecord, type InvoiceStatus } from "@/lib/invoice-store"
+import { financeStore } from "@/lib/finance-store"
+import { invoiceBalance } from "@/lib/finance-engine"
 import { formatOMR } from "@/lib/financial-calculator"
 
 export function InvoicesLedger() {
@@ -53,7 +55,7 @@ export function InvoicesLedger() {
   const { toast } = useToast()
 
   useEffect(() => {
-    setInvoices(invoiceStore.getInvoices())
+    const load = () => { const snapshot = financeStore.getSnapshot(); setInvoices(snapshot.invoices.map(inv => { if(inv.status === "Draft" || inv.status === "Cancelled") return inv; const balance = invoiceBalance(snapshot, inv.id); return {...inv, paidAmount: inv.total - balance, status: (balance === 0 ? "Paid" : balance < inv.total ? "Partially Paid" : "Finalized") as InvoiceStatus} })) }; load()
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search)
       const querySearch = urlParams.get("search")
@@ -61,9 +63,7 @@ export function InvoicesLedger() {
         setSearch(querySearch)
       }
     }
-    const unsubscribe = invoiceStore.subscribe(() => {
-      setInvoices(invoiceStore.getInvoices())
-    })
+    const unsubscribe = financeStore.subscribe(load)
     return () => {
       unsubscribe()
     }
@@ -108,17 +108,7 @@ export function InvoicesLedger() {
     }
   }
 
-  const handleMarkPaid = (id: string) => {
-    try {
-      invoiceStore.markInvoicePaid(id)
-      toast({
-        title: "Marked as Paid",
-        description: "Payment status recorded.",
-      })
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" })
-    }
-  }
+  const handleMarkPaid = (id: string) => { const invoice = invoices.find(i => i.id === id); router.push(`/finance/payments?customer=${encodeURIComponent(invoice?.customerId || '')}&invoice=${encodeURIComponent(id)}&add=1`) }
 
   const handleDuplicate = (id: string) => {
     try {
@@ -348,7 +338,7 @@ export function InvoicesLedger() {
                               className="flex items-center gap-2 cursor-pointer text-emerald-700"
                             >
                               <CheckCircle className="h-4 w-4" />
-                              <span>Mark as Paid</span>
+                              <span>Record Payment</span>
                             </DropdownMenuItem>
                           )}
 

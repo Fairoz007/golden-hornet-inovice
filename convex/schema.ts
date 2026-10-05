@@ -25,6 +25,13 @@ export default defineSchema({
 
   customers: defineTable({
     companyName: v.string(),
+    customerCode: v.optional(v.string()),
+    crNumber: v.optional(v.string()),
+    customerType: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
+    paymentTerms: v.optional(v.string()),
+    creditLimit: v.optional(v.number()),
+    accountStatus: v.optional(v.string()),
     poBox: v.optional(v.string()),
     address: v.string(),
     city: v.optional(v.string()),
@@ -39,6 +46,7 @@ export default defineSchema({
   invoices: defineTable({
     invoiceNumber: v.string(),
     invoiceDate: v.string(),
+    sourceDocumentId: v.optional(v.id("customerDocuments")),
     dueDate: v.string(),
     customerId: v.optional(v.string()),
     customerSnapshot: v.object({
@@ -106,7 +114,41 @@ export default defineSchema({
   })
     .index("by_invoice_number", ["invoiceNumber"])
     .index("by_status", ["status"])
-    .index("by_created_at", ["createdAt"]),
+    .index("by_created_at", ["createdAt"])
+    .index("by_customer", ["customerId"]),
+
+  // Amounts below are integer baisa; balances are always derived, never stored.
+  customerAccounts: defineTable({
+    customerId: v.id("customers"), currency: v.string(), createdAt: v.number(),
+  }).index("by_customer_currency", ["customerId", "currency"]),
+  payments: defineTable({
+    accountId: v.id("customerAccounts"), customerId: v.id("customers"),
+    date: v.string(), amountBaisa: v.number(), currency: v.string(), method: v.string(),
+    treatment: v.string(), reference: v.string(), bankReference: v.optional(v.string()),
+    chequeNumber: v.optional(v.string()), description: v.string(), notes: v.optional(v.string()),
+    attachmentId: v.optional(v.id("_storage")), createdAt: v.number(),
+    reversedAt: v.optional(v.number()), reversalReason: v.optional(v.string()),
+  }).index("by_customer", ["customerId"]).index("by_reference", ["reference"]),
+  paymentAllocations: defineTable({
+    paymentId: v.id("payments"), customerId: v.id("customers"),
+    invoiceId: v.optional(v.id("invoices")), transactionId: v.optional(v.id("financialTransactions")),
+    amountBaisa: v.number(), date: v.string(), createdAt: v.number(),
+  }).index("by_payment", ["paymentId"]).index("by_invoice", ["invoiceId"]),
+  financialTransactions: defineTable({
+    accountId: v.id("customerAccounts"), customerId: v.id("customers"), currency: v.string(),
+    date: v.string(), type: v.string(), reference: v.string(), description: v.string(),
+    debitBaisa: v.number(), creditBaisa: v.number(), vatBaisa: v.optional(v.number()),
+    invoiceId: v.optional(v.id("invoices")), paymentId: v.optional(v.id("payments")),
+    reversesId: v.optional(v.id("financialTransactions")), createdAt: v.number(),
+  }).index("by_customer", ["customerId"]).index("by_account", ["accountId"]),
+  expenses: defineTable({
+    date: v.string(), reference: v.string(), description: v.string(), currency: v.string(),
+    amountBaisa: v.number(), inputVatBaisa: v.number(), createdAt: v.number(),
+  }).index("by_date", ["date"]),
+  customerContacts: defineTable({ customerId: v.id("customers"), name: v.string(), role: v.optional(v.string()), phone: v.optional(v.string()), email: v.optional(v.string()) }).index("by_customer", ["customerId"]),
+  customerProjects: defineTable({ customerId: v.id("customers"), name: v.string(), site: v.optional(v.string()), status: v.string(), createdAt: v.number() }).index("by_customer", ["customerId"]),
+  customerDocuments: defineTable({ parentRecordId: v.optional(v.id("customerDocuments")), customerId: v.id("customers"), type: v.string(), reference: v.string(), date: v.string(), storageId: v.optional(v.id("_storage")), notes: v.optional(v.string()), createdAt: v.number() }).index("by_customer", ["customerId"]),
+  customerNotes: defineTable({ customerId: v.id("customers"), text: v.string(), createdAt: v.number() }).index("by_customer", ["customerId"]),
 
   invoiceItems: defineTable({
     invoiceId: v.string(),

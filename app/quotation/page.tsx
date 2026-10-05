@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { QuotationForm, type QuotationData } from "@/components/quotation-form"
 import { QuotationPreview } from "@/components/quotation-preview"
+import { CustomerDocumentSave } from "@/components/customer-document-save"
 import { Button } from "@/components/ui/button"
 import { Download, Printer, RotateCcw, Save, Sparkles, FileSpreadsheet, CheckCircle2 } from "lucide-react"
 import jsPDF from "jspdf"
@@ -253,6 +254,7 @@ export default function QuotationPage() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        <CustomerDocumentSave kind="Quotations" reference={data.quotationNumber} date={data.quotationDate} data={data} />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Input Form */}
           <div className="lg:col-span-6 space-y-6 print:hidden">

@@ -44,9 +44,17 @@ import {
 } from "@/components/ui/sheet"
 import { invoiceStore, Customer, InvoiceRecord } from "@/lib/invoice-store"
 import { formatOMR } from "@/lib/financial-calculator"
+import { useFinance } from "@/lib/finance-view"
+import { customerSummary } from "@/lib/finance-engine"
+import { accountDocuments } from "@/lib/account-documents"
 
 export default function CustomersPage() {
   const router = useRouter()
+  const finance = useFinance()
+  const [view, setView] = useState("All Customers")
+  const [sort, setSort] = useState("Name")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -80,20 +88,40 @@ export default function CustomersPage() {
     return invoiceStore.subscribe(load)
   }, [])
 
-  // Filtered customers
+  const lastActivity = useMemo(() => {
+    const dates: Record<string, number> = Object.fromEntries(customers.map(c=>[c.id,c.updatedAt]))
+    if(finance) {
+      for(const i of finance.invoices) if(i.customerId) dates[i.customerId]=Math.max(dates[i.customerId]||0,i.updatedAt)
+      for(const p of finance.payments) dates[p.customerId]=Math.max(dates[p.customerId]||0,p.createdAt,p.reversedAt?Date.parse(p.reversedAt):0)
+      for(const t of finance.transactions) dates[t.customerId]=Math.max(dates[t.customerId]||0,t.createdAt)
+    }
+    for(const c of customers) for(const a of accountDocuments.getActivity(c.id)) dates[c.id]=Math.max(dates[c.id],a.timestamp)
+    return dates
+  },[customers,finance])
+  // Account views use the same derived balances as customer profiles and finance.
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customers
-    const q = searchQuery.toLowerCase()
-    return customers.filter(
-      (c) =>
-        c.companyName.toLowerCase().includes(q) ||
-        (c.vatin && c.vatin.toLowerCase().includes(q)) ||
-        (c.email && c.email.toLowerCase().includes(q)) ||
-        (c.phone && c.phone.toLowerCase().includes(q)) ||
-        (c.address && c.address.toLowerCase().includes(q)) ||
-        (c.poBox && c.poBox.toLowerCase().includes(q))
-    )
-  }, [customers, searchQuery])
+    const q = searchQuery.trim().toLowerCase()
+    let rows = customers.filter(c => [c.companyName,c.vatin,c.email,c.phone,c.address,c.poBox].some(v=>v?.toLowerCase().includes(q)))
+    if(finance) rows = rows.filter(c => {
+      const s=customerSummary(finance,c.id)
+      const last=finance.payments.filter(p=>p.customerId===c.id&&!p.reversedAt).sort((a,b)=>b.date.localeCompare(a.date))[0]
+      if(dateFrom && new Date(lastActivity[c.id]||c.updatedAt).toISOString().slice(0,10)<dateFrom) return false
+      if(dateTo && new Date(lastActivity[c.id]||c.updatedAt).toISOString().slice(0,10)>dateTo) return false
+      if(view==="Active Customers") return (accountDocuments.getProfile(c.id).accountStatus||"Active")==="Active"
+      if(view==="Customers With Balance") return s.totalOutstanding>0
+      if(view==="Customers With Credit") return s.creditBalance>0
+      if(view==="Customers With Advance Payments") return s.advanceBalance>0
+      if(view==="Customers With Overdue Amounts") return s.totalOverdue>0
+      if(view==="Customers Without Recent Payments") return !last || Date.now()-new Date(last.date).getTime()>90*86400000
+      return true
+    })
+    return rows.sort((a,b)=>{
+      if((sort==="Revenue"||view==="Top Revenue Customers")&&finance) return customerSummary(finance,b.id).totalRevenue-customerSummary(finance,a.id).totalRevenue
+      if((sort==="Outstanding"||view==="Top Outstanding Customers")&&finance)return customerSummary(finance,b.id).totalOutstanding-customerSummary(finance,a.id).totalOutstanding
+      if(sort==="Recent Activity"||view==="Recently Active Customers")return (lastActivity[b.id]||b.updatedAt)-(lastActivity[a.id]||a.updatedAt)
+      return a.companyName.localeCompare(b.companyName)
+    })
+  }, [customers, searchQuery,finance,view,sort,dateFrom,dateTo,lastActivity])
 
   // Customer metrics helper
   const customerStats = useMemo(() => {
@@ -124,14 +152,11 @@ export default function CustomersPage() {
       }
     })
 
+    if(finance) customers.forEach(c=>{statsMap[c.id].totalBilled=customerSummary(finance,c.id).totalInvoiced})
     return statsMap
-  }, [customers, invoices])
+  }, [customers, invoices, finance])
 
-  const totalRevenue = useMemo(() => {
-    return invoices
-      .filter((inv) => inv.status !== "Cancelled")
-      .reduce((sum, inv) => sum + inv.total, 0)
-  }, [invoices])
+  const totalRevenue = useMemo(() => finance ? customers.reduce((sum,c)=>sum+Math.round(customerSummary(finance,c.id).totalInvoiced*1000),0)/1000 : 0, [customers,finance])
 
   // Reset form
   const resetForm = () => {
@@ -350,6 +375,12 @@ export default function CustomersPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-3 rounded-xl border bg-white p-4">
+          <select aria-label="Customer account view" className="rounded border p-2 text-sm" value={view} onChange={e=>setView(e.target.value)}>{["All Customers","Active Customers","Customers With Balance","Customers With Credit","Customers With Advance Payments","Customers With Overdue Amounts","Customers Without Recent Payments","Top Revenue Customers","Top Outstanding Customers","Recently Active Customers"].map(v=><option key={v}>{v}</option>)}</select>
+          <select aria-label="Sort customers" className="rounded border p-2 text-sm" value={sort} onChange={e=>setSort(e.target.value)}>{["Name","Revenue","Outstanding","Recent Activity"].map(v=><option key={v}>{v}</option>)}</select>
+          <label className="text-xs">Activity From <Input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/></label>
+          <label className="text-xs">Activity To <Input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/></label>
+        </div>
         {/* Customers Table */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
           <div className="overflow-x-auto">
@@ -391,7 +422,7 @@ export default function CustomersPage() {
                             </div>
                             <div>
                               <div className="font-bold text-slate-900 hover:text-amber-700 transition-colors text-xs sm:text-sm">
-                                {cust.companyName}
+                                <Link href={`/customers/${cust.id}`}>{cust.companyName}</Link>
                               </div>
                               {cust.notes && (
                                 <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">

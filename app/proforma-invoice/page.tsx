@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoicePreview } from "@/components/invoice-preview"
+import { CustomerDocumentSave } from "@/components/customer-document-save"
 import { Button } from "@/components/ui/button"
 import { Download, Printer, RotateCcw, Save, Sparkles, FileCheck, CheckCircle2 } from "lucide-react"
 import jsPDF from "jspdf"
@@ -291,6 +292,7 @@ export default function ProformaInvoicePage() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        <CustomerDocumentSave kind="Proforma Invoices" reference={data.invoiceNumber} date={data.invoiceDate} data={data} />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Input Form */}
           <div className="lg:col-span-6 space-y-6 print:hidden">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { DOForm, type DOData } from "@/components/do-form"
 import { DOPreview } from "@/components/do-preview"
+import { CustomerDocumentSave } from "@/components/customer-document-save"
 import { Button } from "@/components/ui/button"
 import { Download, Printer, RotateCcw, Save, Sparkles, Truck, CheckCircle2 } from "lucide-react"
 import jsPDF from "jspdf"
@@ -256,6 +257,7 @@ export default function DeliveryOrderPage() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6">
+        <CustomerDocumentSave kind="Delivery Orders" reference={data.doNumber} date={data.doDate} data={data} />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Input Form */}
           <div className="lg:col-span-6 space-y-6 print:hidden">

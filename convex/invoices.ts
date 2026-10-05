@@ -1,32 +1,9 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
 
-// Financial calculator for backend validation
-function calculateFinancials(
-  items: Array<{ quantity: number; rate: number; taxRate?: number }>,
-  discountAmount = 0,
-  vatRate = 5
-) {
-  let subtotalBaisas = 0
-  let vatBaisas = 0
-
-  for (const item of items) {
-    const q = Math.max(0, Number(item.quantity) || 0)
-    const r = Math.max(0, Number(item.rate) || 0)
-    const rate = item.taxRate !== undefined ? Number(item.taxRate) : vatRate
-    const lineAmount = Math.round(q * r * 1000) / 1000
-    subtotalBaisas += Math.round(lineAmount * 1000)
-    const taxAmount = Math.round(((lineAmount * rate) / 100) * 1000) / 1000
-    vatBaisas += Math.round(taxAmount * 1000)
-  }
-
-  const subtotal = subtotalBaisas / 1000
-  const discount = Math.min(subtotal, Math.max(0, discountAmount))
-  const taxableValue = (subtotalBaisas - Math.round(discount * 1000)) / 1000
-  const vatAmount = vatBaisas / 1000
-  const total = (Math.round(taxableValue * 1000) + Math.round(vatAmount * 1000)) / 1000
-
-  return { subtotal, discount, taxableValue, vatRate, vatAmount, total }
+import { calculateInvoiceFinancials } from "../lib/financial-calculator"
+function calculateFinancials(items: Array<{ quantity: number; rate: number; taxRate?: number }>, discount = 0, vatRate = 5) {
+  return calculateInvoiceFinancials(items.map(item => ({ ...item, unitPrice: item.rate })), discount, vatRate)
 }
 
 export const list = query({
@@ -360,25 +337,7 @@ export const markPaid = mutation({
       throw new Error("Cannot mark a cancelled invoice as paid")
     }
 
-    const now = Date.now()
-    const prevStatus = invoice.status
-    await ctx.db.patch(args.id, {
-      status: "Paid",
-      updatedAt: now,
-    })
-
-    await ctx.db.insert("auditLogs", {
-      timestamp: now,
-      action: "INVOICE_MARKED_PAID",
-      entityType: "invoice",
-      entityId: args.id,
-      invoiceNumber: invoice.invoiceNumber,
-      user: "System User",
-      previousValues: { status: prevStatus },
-      newValues: { status: "Paid" },
-      changedFields: ["status"],
-      description: `Invoice ${invoice.invoiceNumber} marked as Paid.`,
-    })
+    throw new Error("Record and allocate a customer payment through Finance. Paid status must derive from actual receipts.")
 
     return args.id
   },
@@ -390,6 +349,14 @@ export const cancel = mutation({
     const invoice = await ctx.db.get(args.id)
     if (!invoice) throw new Error("Invoice not found")
 
+    const allocations = await ctx.db.query("paymentAllocations").withIndex("by_invoice", q => q.eq("invoiceId", args.id)).collect()
+    for (const allocation of allocations) {
+      const payment = await ctx.db.get(allocation.paymentId)
+      if (payment && !payment.reversedAt) throw new Error("Reverse allocated payments before cancelling this invoice")
+    }
+    const notes = await ctx.db.query("financialTransactions").collect()
+    if (notes.some(note => note.invoiceId === args.id)) throw new Error("Invoice has financial notes; issue correcting transactions instead of cancellation")
+    if (invoice.status === "Paid") throw new Error("Legacy paid invoice requires payment reconciliation before cancellation")
     const now = Date.now()
     const prevStatus = invoice.status
     await ctx.db.patch(args.id, {
@@ -424,8 +391,9 @@ export const duplicate = mutation({
     const today = new Date().toISOString().split("T")[0]
     const due = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
 
+    const { _id, _creationTime, ...source } = original
     const newId = await ctx.db.insert("invoices", {
-      ...original,
+      ...source,
       invoiceNumber: args.newInvoiceNumber,
       invoiceDate: today,
       dueDate: due,

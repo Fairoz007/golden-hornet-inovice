@@ -74,6 +74,7 @@ export function calculateInvoiceFinancials(
 ): InvoiceFinancialSummary {
   let subtotalBaisas = 0
   let vatBaisas = 0
+  const lines: {amount: number; rate: number}[] = []
 
   for (const item of items) {
     const qty = Number(item.quantity) || 0
@@ -83,6 +84,7 @@ export function calculateInvoiceFinancials(
     const lineAmount = calculateLineAmount(qty, price)
     subtotalBaisas += Math.round(lineAmount * 1000)
 
+    lines.push({amount: Math.round(lineAmount * 1000), rate})
     const taxAmount = calculateLineTax(lineAmount, rate)
     vatBaisas += Math.round(taxAmount * 1000)
   }
@@ -90,6 +92,16 @@ export function calculateInvoiceFinancials(
   const subtotal = subtotalBaisas / 1000
   const discount = Math.min(subtotal, Math.max(0, roundOMR(Number(discountAmount) || 0)))
   const taxableValue = roundOMR(subtotal - discount)
+  const discountBaisa = Math.round(discount * 1000)
+  let allocatedDiscount = 0
+  let cumulativeLineAmount = 0
+  vatBaisas = lines.reduce((tax, line, index) => {
+    cumulativeLineAmount += line.amount
+    const cumulativeDiscount = index === lines.length - 1 ? discountBaisa : Math.round(discountBaisa * cumulativeLineAmount / Math.max(1, subtotalBaisas))
+    const portion = cumulativeDiscount - allocatedDiscount
+    allocatedDiscount += portion
+    return tax + Math.round(Math.max(0, line.amount - portion) * line.rate / 100)
+  }, 0)
   const vatAmount = roundOMR(vatBaisas / 1000)
   const total = roundOMR(taxableValue + vatAmount)
 

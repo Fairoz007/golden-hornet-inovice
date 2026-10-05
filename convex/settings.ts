@@ -215,6 +215,7 @@ export const updateAsset = mutation({
       const id = await ctx.db.insert("settings", {
         ...DEFAULT_SETTINGS,
         ...patchData,
+        updatedAt: now,
       })
       await ctx.db.insert("auditLogs", {
         timestamp: now,

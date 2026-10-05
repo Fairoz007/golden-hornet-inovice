@@ -36,6 +36,7 @@ import {
   type InvoiceStatus,
 } from "@/lib/invoice-store"
 import { GoldenHornetInvoiceView } from "@/components/golden-hornet-invoice-view"
+import { financeStore } from "@/lib/finance-store"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 
@@ -59,7 +60,7 @@ export default function InvoiceDetailPage() {
     setAuditLogs(invoiceStore.getAuditLogs().filter((l) => l.entityId === invoiceId))
     setIsLoading(false)
 
-    const unsubscribe = invoiceStore.subscribe(() => {
+    const unsubscribe = financeStore.subscribe(() => {
       const updated = invoiceStore.getInvoiceById(invoiceId)
       setInvoice(updated || null)
       setAuditLogs(invoiceStore.getAuditLogs().filter((l) => l.entityId === invoiceId))
@@ -110,17 +111,7 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  const handleMarkPaid = () => {
-    try {
-      invoiceStore.markInvoicePaid(invoice.id)
-      toast({
-        title: "Marked as Paid",
-        description: "Payment has been recorded successfully.",
-      })
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" })
-    }
-  }
+  const handleMarkPaid = () => router.push(`/finance/payments?customer=${encodeURIComponent(invoice.customerId || '')}&invoice=${encodeURIComponent(invoice.id)}&add=1`)
 
   const handleDuplicate = () => {
     try {
@@ -274,7 +265,7 @@ export default function InvoiceDetailPage() {
                 className="gap-1.5 text-xs text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 font-semibold"
               >
                 <CheckCircle className="h-3.5 w-3.5" />
-                Mark as Paid
+                Record Payment
               </Button>
             )}
 

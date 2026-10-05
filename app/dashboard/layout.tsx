@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Invoices Management | Golden Hornet LLC",
-  description: "Tax Invoices Management for Golden Hornet LLC.",
+  title: "Financial Dashboard | Golden Hornet LLC",
+  description: "Tax Financial Dashboard for Golden Hornet LLC.",
 }
 
 export default function DashboardLayout({
