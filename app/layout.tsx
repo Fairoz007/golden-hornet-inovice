@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import localFont from "next/font/local"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
@@ -7,6 +7,7 @@ import "./globals.css"
 const geist = localFont({ src: "../public/fonts/geist-latin.woff2", variable: "--font-geist", display: "swap" })
 const geistMono = localFont({ src: "../public/fonts/geist-mono-latin.woff2", variable: "--font-geist-mono", display: "swap" })
 
+import { Toaster } from "@/components/ui/toaster"
 import { Navbar } from "@/components/navbar"
 
 export const metadata: Metadata = {
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" }
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,7 +32,8 @@ export default function RootLayout({
     <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-[#f4f7f7] font-sans antialiased text-slate-900">
         <Navbar />
-        <div className="min-h-screen pt-14 md:ml-[248px] md:pt-0">{children}</div>
+        <div className="min-h-screen pt-24 md:ml-[248px] md:pt-0 print:ml-0 print:pt-0">{children}</div>
+        <Toaster />
       </body>
     </html>
   )

@@ -29,6 +29,8 @@ import { GOLDEN_HORNET_COMPANY } from "@/lib/dummy-data"
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const saveFailed = useRef(false)
   const [activeTab, setActiveTab] = useState("company")
 
   // File upload refs
@@ -102,7 +104,21 @@ export default function SettingsPage() {
     })
   }, [])
 
+  const persistSettings = (...args: Parameters<typeof invoiceStore.updateSettings>) => {
+    try {
+      invoiceStore.updateSettings(...args)
+      saveFailed.current = false
+      setErrorMessage(null)
+      return true
+    } catch (error) {
+      saveFailed.current = true
+      setSuccessMessage(null)
+      setErrorMessage(error instanceof Error ? `Settings were not saved: ${error.message}` : "Settings were not saved. Browser storage may be full.")
+      return false
+    }
+  }
   const showNotification = (msg: string) => {
+    if (saveFailed.current) return
     setSuccessMessage(msg)
     setTimeout(() => {
       setSuccessMessage(null)
@@ -118,19 +134,21 @@ export default function SettingsPage() {
   ) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setErrorMessage(null)
+    if (!file.type.startsWith("image/")) { setErrorMessage("Choose an image file for this company asset."); e.target.value = ""; return }
+    if (file.size > 1_000_000) { setErrorMessage("Company asset images must be under 1 MB to fit this browser workspace."); e.target.value = ""; return }
 
     const reader = new FileReader()
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string
       if (dataUrl) {
-        setAssets((prev) => ({ ...prev, [assetType]: dataUrl }))
-        invoiceStore.updateSettings(
-          { [assetType]: dataUrl },
-          { action: actionName, description }
-        )
-        showNotification(`${description} saved successfully.`)
+        if (persistSettings({ [assetType]: dataUrl }, { action: actionName, description })) {
+          setAssets((prev) => ({ ...prev, [assetType]: dataUrl }))
+          showNotification(`${description} saved successfully.`)
+        }
       }
     }
+    reader.onerror = () => setErrorMessage("The image could not be read. Please choose it again.")
     reader.readAsDataURL(file)
   }
 
@@ -140,21 +158,23 @@ export default function SettingsPage() {
     defaultPath: string,
     label: string
   ) => {
-    setAssets((prev) => ({ ...prev, [assetType]: defaultPath }))
-    invoiceStore.updateSettings(
+    const saved = persistSettings(
       { [assetType]: defaultPath },
       {
         action: `${assetType.toUpperCase().replace("URL", "")}_RESET`,
         description: `Reset ${label} to official Golden Hornet default asset.`,
       }
     )
-    showNotification(`Reset ${label} to official default.`)
+    if (saved) {
+      setAssets((prev) => ({ ...prev, [assetType]: defaultPath }))
+      showNotification(`Reset ${label} to official default.`)
+    }
   }
 
   // Save company details
   const handleSaveCompany = (e: React.FormEvent) => {
     e.preventDefault()
-    invoiceStore.updateSettings(
+    persistSettings(
       { companyDetails: companyForm },
       {
         action: "COMPANY_SETTINGS_CHANGED",
@@ -167,7 +187,7 @@ export default function SettingsPage() {
   // Save bank details
   const handleSaveBank = (e: React.FormEvent) => {
     e.preventDefault()
-    invoiceStore.updateSettings(
+    persistSettings(
       { bankDetails: bankForm },
       {
         action: "BANK_DETAILS_CHANGED",
@@ -180,7 +200,7 @@ export default function SettingsPage() {
   // Save invoice config
   const handleSaveInvoiceConfig = (e: React.FormEvent) => {
     e.preventDefault()
-    invoiceStore.updateSettings(
+    persistSettings(
       {
         defaultVatRate: Number(invoiceConfigForm.defaultVatRate),
         startingInvoiceSequence: Number(invoiceConfigForm.startingInvoiceSequence),
@@ -198,7 +218,7 @@ export default function SettingsPage() {
   // Toggle Stamp / Signature default
   const handleToggleStamp = (enabled: boolean) => {
     setAssetToggles((prev) => ({ ...prev, enableStamp: enabled }))
-    invoiceStore.updateSettings(
+    persistSettings(
       { enableStamp: enabled },
       {
         action: "STAMP_TOGGLED",
@@ -214,7 +234,7 @@ export default function SettingsPage() {
 
   const handleToggleSignature = (enabled: boolean) => {
     setAssetToggles((prev) => ({ ...prev, enableSignature: enabled }))
-    invoiceStore.updateSettings(
+    persistSettings(
       { enableSignature: enabled },
       {
         action: "SIGNATURE_TOGGLED",
@@ -280,7 +300,7 @@ export default function SettingsPage() {
       signatureUrl: "/images/signature.png",
     })
 
-    invoiceStore.updateSettings(
+    persistSettings(
       {
         companyDetails: baselineCompany,
         bankDetails: baselineBank,
@@ -341,6 +361,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Success Alert Banner */}
+        {errorMessage && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{errorMessage}</p>}
         {successMessage && (
           <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 flex items-center gap-2 shadow-2xs transition-all">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />

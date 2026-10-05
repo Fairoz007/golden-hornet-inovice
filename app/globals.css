@@ -10,19 +10,19 @@
   --card-foreground: #252525;
   --popover: #ffffff;
   --popover-foreground: #252525;
-  --primary: #343434;
+  --primary: #047857;
   --primary-foreground: #fbfbfb;
   --secondary: #f7f7f7;
   --secondary-foreground: #343434;
   --muted: #f7f7f7;
-  --muted-foreground: #8e8e8e;
+  --muted-foreground: #64748b;
   --accent: #f7f7f7;
   --accent-foreground: #343434;
   --destructive: #ef4444;
   --destructive-foreground: #f87171;
   --border: #ebebeb;
   --input: #ebebeb;
-  --ring: #b4b4b4;
+  --ring: #10b981;
   --chart-1: #f97316;
   --chart-2: #06b6d4;
   --chart-3: #0891b2;
@@ -123,4 +123,26 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { -webkit-font-smoothing: antialiased; }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid #059669;
+    outline-offset: 3px;
+  }
+  button:not(:disabled), select { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  ::selection { background: #a7f3d0; color: #064e3b; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+@media (max-width: 767px) {
+  input, select, textarea { font-size: max(16px, 1em); }
+}
+@media print {
+  body { background: white !important; }
 }

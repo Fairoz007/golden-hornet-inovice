@@ -51,7 +51,7 @@ export default function CreateInvoicePage() {
 
   // Invoice Form State
   const [invoiceNumber, setInvoiceNumber] = useState("")
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0])
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Muscat" }))
   const [dueDate, setDueDate] = useState(
     new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0]
   )
@@ -84,20 +84,18 @@ export default function CreateInvoicePage() {
     {
       id: "it-init-1",
       serialNumber: 1,
-      description: "Rental Charges for Hiring NON PDO Tipper With Driver\nReg.NO : 0390",
-      poReference: "RT-OM-PRJ-O-304-2026-0063",
-      quantity: 266,
+      description: "",
+      poReference: "",
+      quantity: 1,
       unit: "Hrs",
-      rate: 5.0,
+      rate: 0,
       taxRate: settings.defaultVatRate,
-      amount: 1330.0,
+      amount: 0,
     },
   ])
 
   const [discount, setDiscount] = useState<number>(0)
-  const [notes, setNotes] = useState(
-    "Rental charges certified as per site supervisor work logs. All rates inclusive of fuel and certified PDO-standard driver."
-  )
+  const [notes, setNotes] = useState("")
 
   useEffect(() => {
     const custs = invoiceStore.getCustomers()
@@ -114,10 +112,6 @@ export default function CreateInvoicePage() {
       if (queryCustId) {
         targetCust = custs.find((c) => c.id === queryCustId) || null
       }
-    }
-
-    if (!targetCust && custs.length > 0) {
-      targetCust = custs[0]
     }
 
     if (targetCust) {
@@ -147,6 +141,14 @@ export default function CreateInvoicePage() {
       setCustomerVatin(c.vatin || "")
       setCustomerPhone(c.phone || "")
       setCustomerEmail(c.email || "")
+    } else {
+      setCustomerName("")
+      setCustomerPoBox("")
+      setCustomerAddress("")
+      setCustomerCity("Sultanate of Oman")
+      setCustomerVatin("")
+      setCustomerPhone("")
+      setCustomerEmail("")
     }
   }
 

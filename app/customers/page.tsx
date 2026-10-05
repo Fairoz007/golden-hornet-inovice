@@ -293,11 +293,10 @@ export default function CustomersPage() {
             <Info className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
             <div className="text-xs text-slate-700 space-y-1">
               <span className="font-bold text-amber-900">
-                Audit Safe Client Architecture & Immutable Snapshots:
+                Customer details and issued documents
               </span>
               <p className="text-slate-600 leading-relaxed">
-                When you create or update client records here, new invoices will automatically inherit the current details.
-                However, existing finalized and paid invoices preserve an <strong>immutable snapshot</strong> of the customer details at the exact moment of issuance to guarantee full regulatory compliance with Oman Tax Authority audits.
+                Updates apply to new invoices. Issued invoices retain the customer details recorded when they were created. Open a customer to review their payments, balance and documents.
               </p>
             </div>
           </div>
@@ -312,7 +311,7 @@ export default function CustomersPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-slate-900">{customers.length}</span>
-              <span className="text-[11px] text-slate-400">active accounts</span>
+              <span className="text-[11px] text-slate-400">customer accounts</span>
             </div>
           </div>
 
@@ -364,6 +363,7 @@ export default function CustomersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               type="text"
+              aria-label="Search customers"
               placeholder="Search by name, VATIN, phone, address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

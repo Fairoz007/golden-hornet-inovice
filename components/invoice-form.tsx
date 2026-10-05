@@ -295,7 +295,7 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
             type="button"
             size="sm"
             onClick={addItem}
-            className="h-8 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold"
+            className="h-11 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Item
@@ -318,7 +318,8 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
                     variant="ghost"
                     size="sm"
                     onClick={() => removeItem(index)}
-                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    aria-label={`Remove item ${index + 1}`}
+                    className="h-11 w-11 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -327,17 +328,19 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
 
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                 <div className="sm:col-span-2">
-                  <Label className="text-[11px] text-slate-600 font-medium">Sl. No</Label>
+                  <Label htmlFor={`invoice-line-${index}-itemNo`} className="text-xs text-slate-600 font-medium">Sl. No</Label>
                   <Input
+                    id={`invoice-line-${index}-itemNo`}
                     value={item.itemNo}
                     onChange={(e) => handleItemChange(index, "itemNo", e.target.value)}
-                    className="h-8 text-xs mt-0.5"
+                    className="h-11 text-sm mt-0.5"
                   />
                 </div>
                 <div className="sm:col-span-5">
-                  <Label className="text-[11px] text-slate-600 font-medium">Description</Label>
+                  <Label htmlFor={`invoice-line-${index}-description`} className="text-xs text-slate-600 font-medium">Description</Label>
                   <Textarea
                     rows={2}
+                    id={`invoice-line-${index}-description`}
                     value={item.description}
                     onChange={(e) => handleItemChange(index, "description", e.target.value)}
                     placeholder="e.g. Rental Charges for Hiring NON PDO Tipper With Driver Reg.NO : 0390"
@@ -345,31 +348,34 @@ export function InvoiceForm({ invoiceData, setInvoiceData, onLoadPreset }: Invoi
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label className="text-[11px] text-slate-600 font-medium">PO Ref</Label>
+                  <Label htmlFor={`invoice-line-${index}-poRef`} className="text-xs text-slate-600 font-medium">PO Ref</Label>
                   <Input
+                    id={`invoice-line-${index}-poRef`}
                     value={item.poRef || ""}
                     onChange={(e) => handleItemChange(index, "poRef", e.target.value)}
                     placeholder="PO Ref"
-                    className="h-8 text-xs mt-0.5"
+                    className="h-11 text-sm mt-0.5"
                   />
                 </div>
                 <div className="sm:col-span-1">
-                  <Label className="text-[11px] text-slate-600 font-medium">Qty</Label>
+                  <Label htmlFor={`invoice-line-${index}-quantity`} className="text-xs text-slate-600 font-medium">Qty</Label>
                   <Input
                     type="number"
+                    id={`invoice-line-${index}-quantity`}
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                    className="h-8 text-xs mt-0.5"
+                    className="h-11 text-sm mt-0.5"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label className="text-[11px] text-slate-600 font-medium">Rate (OMR)</Label>
+                  <Label htmlFor={`invoice-line-${index}-unitPrice`} className="text-xs text-slate-600 font-medium">Rate (OMR)</Label>
                   <Input
                     type="number"
                     step="0.001"
+                    id={`invoice-line-${index}-unitPrice`}
                     value={item.unitPrice}
                     onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
-                    className="h-8 text-xs mt-0.5 font-semibold text-right"
+                    className="h-11 text-sm mt-0.5 font-semibold text-right"
                   />
                 </div>
               </div>
